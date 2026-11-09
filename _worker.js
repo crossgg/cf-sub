@@ -6601,6 +6601,7 @@ rules:
 // =========================================================================
 export default {
     async fetch(request, env, ctx) {
+        try {
         const url = new URL(request.url);
         // 0. 全局记录每日请求数与当前域名配额监控
         recordDailyRequestMetrics(request, url, env, ctx);
@@ -6744,6 +6745,13 @@ export default {
         // 4. Web 页面入口 (未登录绝不泄露订阅信息)
         const carrierInfo = detectCarrier(request, url);
         return await renderModernDashboard(url, carrierInfo, env.DOMAIN || env.FALLBACK_DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN, env);
+        } catch (fatalErr) {
+            console.error('[Worker Fatal Exception]', fatalErr);
+            return new Response(`Worker Runtime Exception: ${fatalErr.message || fatalErr}\n\nStack:\n${fatalErr.stack || 'None'}`, {
+                status: 500,
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
+        }
     },
 
     // 定时触发器：轮转抽样 Cloudflare 官方网段，调用中国三网外部探针，更新 KV Top-N。

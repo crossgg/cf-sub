@@ -3,14 +3,20 @@
   "version": "1.0.0",
   "description": "Cloudflare Worker Preferred-IP 智能订阅与节点中枢",
   "private": true,
+  "type": "module",
   "scripts": {
-    "deploy": "npx wrangler deploy"
+    "build": "node build.js",
+    "deploy": "node build.js && npx wrangler deploy"
   },
   "devDependencies": {
+    "terser": "^5.39.0",
     "wrangler": "^4.0.0"
   },
   "cloudflare": {
     "bindings": {
+      "XS_SUB_KV": {
+        "description": "【核心存储数据库】存储订阅数据、节点测速缓存与用户 Token，Cloudflare 部署时会自动为你创建并绑定该空间。"
+      },
       "DOMAIN": {
         "description": "【自定义域名】你的子域名（例如 sub.example.com）。主域名必须已托管在同一个 Cloudflare 账号中；若暂无域名可留空，默认使用 workers.dev 免费域名。"
       },

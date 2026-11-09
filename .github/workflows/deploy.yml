@@ -43,13 +43,14 @@ jobs:
           fi
           echo "✅ 绑定 KV ID: $KV_ID"
 
-          echo "📝 3. 动态生成 wrangler.toml..."
+          echo "📝 3. 动态生成 wrangler.toml 并执行混淆构建..."
           cat <<EOF > wrangler.toml
           name = "cf-sub-worker"
-          main = "_worker.js"
+          main = "dist/_worker.js"
           compatibility_date = "2026-09-23"
           compatibility_flags = ["nodejs_compat"]
           workers_dev = true
+          preview_urls = false
 
           [placement]
           region = "aws:us-west-2"
@@ -90,7 +91,9 @@ jobs:
             echo 'ADMIN_EMAIL = "admin@example.com"' >> wrangler.toml
           fi
 
-          echo "🚀 4. 发布 Worker 到 Cloudflare..."
+          echo "🚀 4. 执行代码混淆并发布 Worker 到 Cloudflare..."
+          npm install
+          node build.js
           npx wrangler deploy
 
           echo "🔐 5. 检查与自动注入 Worker Secrets..."

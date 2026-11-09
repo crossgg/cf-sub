@@ -7,7 +7,6 @@ secrets.json
 # Build & temporary files
 .dry-run/
 .wrangler/
-dist/
 node_modules/
 
 # OS files

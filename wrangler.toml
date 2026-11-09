@@ -1,8 +1,9 @@
 name = "cf-sub-worker"
-main = "_worker.js"
+main = "dist/_worker.js"
 compatibility_date = "2026-09-23"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+preview_urls = false
 
 # VLESS TCP 出口固定在美国西部附近，避免 Google 将亚洲边缘出口误判为中国区
 [placement]
@@ -53,7 +54,7 @@ GP_CT_MAGIC = "China Telecom"
 enabled = true
 head_sampling_rate = 0.1
 
-# KV 命名空间绑定（若使用 GitHub Actions 部署会自动创建并绑定；手动部署请填入真实 ID）
-# [[kv_namespaces]]
-# binding = "XS_SUB_KV"
-# id = "你的KV_ID"
+# KV 命名空间绑定（Cloudflare 一键部署向导会自动创建并填充 ID）
+[[kv_namespaces]]
+binding = "XS_SUB_KV"
+id = "<YOUR_KV_NAMESPACE_ID>"
