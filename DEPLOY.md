@@ -12,8 +12,16 @@
 
 ### 1. 获取 Cloudflare API Token
 1. 登录 [Cloudflare 控制台](https://dash.cloudflare.com/)。
+
 2. 点击右上角 **头像** -> **My Profile** -> **API Tokens** -> **Create Token**。
+
 3. 选择 **Edit Cloudflare Workers** 模板完成创建，并复制生成的 Token 字符串。
+
+   可选配置：
+
+   **`PROXYIP`** ：43.168.16.112,161.33.135.154 （留空直连）
+
+     **`VLESS_UUID_V9`** xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  （留空自动生成）
 
 ### 2. 在 GitHub 仓库设置 Secrets
 直接进入仓库设置页：[👉 点击前往 Secrets 设置页面](https://github.com/crossgg/cf-sub/settings/secrets/actions)，点击 **New repository secret**：

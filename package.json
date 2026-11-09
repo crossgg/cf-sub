@@ -4,7 +4,10 @@
   "description": "Cloudflare Worker Preferred-IP 智能订阅与节点中枢",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "npx wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
   },
   "cloudflare": {
     "bindings": {
