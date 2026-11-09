@@ -1,0 +1,142 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Auto Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js 运行环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 自动化检查、绑定 KV 与配置部署
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CUSTOM_DOMAIN: ${{ secrets.DOMAIN }}
+          ADMIN_PASS_INPUT: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::未检测到 CF_API_TOKEN！请在仓库 Settings -> Secrets and variables -> Actions 中添加 CF_API_TOKEN。"
+            exit 1
+          fi
+
+          echo "🔍 1. 检查 Cloudflare 账户连接..."
+          ACCOUNT_ID=$(npx wrangler whoami 2>/dev/null | grep -oE '[a-f0-9]{32}' | head -n 1)
+          if [ -n "$ACCOUNT_ID" ]; then
+            echo "✅ 成功连接 Cloudflare 账户: $ACCOUNT_ID"
+          fi
+
+          echo "🔍 2. 检查 KV 命名空间 (XS_SUB_KV)..."
+          KV_ID=$(npx wrangler kv namespace list 2>/dev/null | jq -r '.[] | select(.title | test("XS_SUB_KV")) | .id' | head -n 1)
+          if [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ]; then
+            echo "📦 未找到 XS_SUB_KV，正在自动创建命名空间..."
+            npx wrangler kv namespace create XS_SUB_KV
+            KV_ID=$(npx wrangler kv namespace list 2>/dev/null | jq -r '.[] | select(.title | test("XS_SUB_KV")) | .id' | head -n 1)
+          fi
+          echo "✅ 绑定 KV ID: $KV_ID"
+
+          echo "📝 3. 动态生成 wrangler.toml..."
+          cat <<EOF > wrangler.toml
+          name = "cf-sub-worker"
+          main = "_worker.js"
+          compatibility_date = "2026-09-23"
+          compatibility_flags = ["nodejs_compat"]
+          workers_dev = true
+
+          [placement]
+          region = "aws:us-west-2"
+
+          [triggers]
+          crons = ["*/30 * * * *"]
+
+          [vars]
+          PROXYIP = ""
+          SUB_TITLE = "Preferred-IP 三网实测订阅"
+          CACHE_TTL = "300"
+          ALLOW_PUBLIC_SUB = "0"
+          ALLOW_STATELESS_TOKENS = "1"
+          ALLOW_LEGACY_WS = "1"
+          ALLOW_REGION_DIRECT_FALLBACK = "1"
+          DEFAULT_REGION = "DIRECT"
+          OPTIMIZER_ENABLED = "1"
+          GLOBALPING_ENABLED = "1"
+
+          [[kv_namespaces]]
+          binding = "XS_SUB_KV"
+          id = "$KV_ID"
+          EOF
+
+          if [ -n "$CUSTOM_DOMAIN" ]; then
+            echo "🌐 配置自定义域名: $CUSTOM_DOMAIN"
+            cat <<EOF >> wrangler.toml
+          DOMAIN = "$CUSTOM_DOMAIN"
+          FALLBACK_DOMAIN = "$CUSTOM_DOMAIN"
+          ADMIN_EMAIL = "admin@$CUSTOM_DOMAIN"
+
+          [[routes]]
+          pattern = "$CUSTOM_DOMAIN"
+          custom_domain = true
+          EOF
+          else
+            echo "🌐 未指定自定义域名，默认使用 workers.dev 域名与默认邮箱"
+            echo 'ADMIN_EMAIL = "admin@example.com"' >> wrangler.toml
+          fi
+
+          echo "🚀 4. 发布 Worker 到 Cloudflare..."
+          npx wrangler deploy
+
+          echo "🔐 5. 检查与自动注入 Worker Secrets..."
+          EXISTING_SECRETS=$(npx wrangler secret list 2>/dev/null || echo "[]")
+
+          # 自动生成 VLESS UUID
+          if ! echo "$EXISTING_SECRETS" | grep -q "VLESS_UUID_V9"; then
+            AUTO_UUID=$(node -e "console.log(crypto.randomUUID())")
+            echo "$AUTO_UUID" | npx wrangler secret put VLESS_UUID_V9
+            echo "✅ 自动生成并保存 VLESS_UUID_V9: $AUTO_UUID"
+          else
+            echo "ℹ️ VLESS_UUID_V9 已存在，保留现有配置。"
+          fi
+
+          # 自动生成 Token 签名密钥
+          if ! echo "$EXISTING_SECRETS" | grep -q "TOKEN_SECRET_V9"; then
+            AUTO_TOKEN_SECRET=$(node -e "console.log(crypto.randomBytes(24).toString('hex'))")
+            echo "$AUTO_TOKEN_SECRET" | npx wrangler secret put TOKEN_SECRET_V9
+            echo "✅ 自动生成并保存 TOKEN_SECRET_V9"
+          else
+            echo "ℹ️ TOKEN_SECRET_V9 已存在，保留现有配置。"
+          fi
+
+          # 自动生成/设置管理员初始密码
+          if ! echo "$EXISTING_SECRETS" | grep -q "ADMIN_PASSWORD_V9"; then
+            if [ -n "$ADMIN_PASS_INPUT" ]; then
+              FINAL_PASS="$ADMIN_PASS_INPUT"
+              echo "✅ 使用用户指定的 ADMIN_PASSWORD"
+            else
+              FINAL_PASS=$(node -e "console.log(crypto.randomBytes(8).toString('hex'))")
+              echo "✅ 自动生成强密码作为初始管理员密码"
+            fi
+            echo "$FINAL_PASS" | npx wrangler secret put ADMIN_PASSWORD_V9
+
+            echo "### 🔑 初始管理员账户凭证" >> $GITHUB_STEP_SUMMARY
+            echo "- **管理员登录邮箱**: \`admin@${CUSTOM_DOMAIN:-example.com}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **管理员初始密码**: \`$FINAL_PASS\`" >> $GITHUB_STEP_SUMMARY
+            echo "> ⚠️ 该初始密码仅在首次部署时生成并展示，请及时妥善保存或登录后台修改。" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ ADMIN_PASSWORD_V9 已存在，密码保持不变。"
+          fi
+
+          echo "### 🎉 部署成功！" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$CUSTOM_DOMAIN" ]; then
+            echo "- **主访问地址**: https://$CUSTOM_DOMAIN" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **说明**: 若使用自定义域名，请确保域名已托管在同一个 Cloudflare 账号中。" >> $GITHUB_STEP_SUMMARY
