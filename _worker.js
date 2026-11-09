@@ -656,7 +656,7 @@ async function getOrLoadCountryPools(env, forceRefresh = false) {
 }
 
 async function buildDomainNodeList(carrierInfo, env, forceRefresh = false) {
-    const domain = env.FALLBACK_DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN;
+    const domain = env.DOMAIN || env.FALLBACK_DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN;
     const uuid = getPrimaryVlessUuidV2(env);
     const pools = await getOrLoadCountryPools(env, forceRefresh);
 
@@ -6743,7 +6743,7 @@ export default {
 
         // 4. Web 页面入口 (未登录绝不泄露订阅信息)
         const carrierInfo = detectCarrier(request, url);
-        return await renderModernDashboard(url, carrierInfo, env.FALLBACK_DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN, env);
+        return await renderModernDashboard(url, carrierInfo, env.DOMAIN || env.FALLBACK_DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN, env);
     },
 
     // 定时触发器：轮转抽样 Cloudflare 官方网段，调用中国三网外部探针，更新 KV Top-N。
