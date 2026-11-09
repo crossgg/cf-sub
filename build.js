@@ -10,13 +10,13 @@ function prepareWranglerConfig() {
 
     try {
         console.log('🔍 [Build] 正在尝试自动检测/创建 Cloudflare KV 命名空间 (XS_SUB_KV)...');
-        let raw = execSync('npx wrangler kv namespace list', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 10000 });
+        let raw = execSync('npx wrangler kv namespace list', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 5000 });
         let list = JSON.parse(raw || '[]');
         let kv = list.find(k => k.title && k.title.includes('XS_SUB_KV'));
         if (!kv) {
             console.log('📦 [Build] 未找到 XS_SUB_KV，尝试自动创建...');
-            execSync('npx wrangler kv namespace create XS_SUB_KV', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 15000 });
-            raw = execSync('npx wrangler kv namespace list', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 10000 });
+            execSync('npx wrangler kv namespace create XS_SUB_KV', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 8000 });
+            raw = execSync('npx wrangler kv namespace list', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 5000 });
             list = JSON.parse(raw || '[]');
             kv = list.find(k => k.title && k.title.includes('XS_SUB_KV'));
         }
