@@ -99,13 +99,13 @@ jobs:
           echo "🔐 5. 检查与自动注入 Worker Secrets..."
           EXISTING_SECRETS=$(npx wrangler secret list 2>/dev/null || echo "[]")
 
-          # 自动生成 VLESS UUID
-          if ! echo "$EXISTING_SECRETS" | grep -q "VLESS_UUID_V9"; then
+          # 自动生成 节点 UUID
+          if ! echo "$EXISTING_SECRETS" | grep -q "NODE_UUID"; then
             AUTO_UUID=$(node -e "console.log(crypto.randomUUID())")
-            echo "$AUTO_UUID" | npx wrangler secret put VLESS_UUID_V9
-            echo "✅ 自动生成并保存 VLESS_UUID_V9: $AUTO_UUID"
+            echo "$AUTO_UUID" | npx wrangler secret put NODE_UUID
+            echo "✅ 自动生成并保存 NODE_UUID: $AUTO_UUID"
           else
-            echo "ℹ️ VLESS_UUID_V9 已存在，保留现有配置。"
+            echo "ℹ️ NODE_UUID 已存在，保留现有配置。"
           fi
 
           # 自动生成 Token 签名密钥

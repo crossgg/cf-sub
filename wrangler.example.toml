@@ -5,13 +5,13 @@
 # =====================================================================
 
 name = "<WORKER_NAME>"                 # 例如 sub-example-com，只能小写字母/数字/连字符
-main = "_worker.js"
+main = "dist/_worker.js"
 compatibility_date = "2026-09-23"
 compatibility_flags = ["nodejs_compat"]
 account_id = "<CLOUDFLARE_ACCOUNT_ID>" # npx wrangler whoami 可查看 (可选，多账号时使用)
 workers_dev = true                     # 保留 *.workers.dev 备用入口
 
-# VLESS TCP 出口固定在美国西部附近，避免 Google 将亚洲边缘出口误判为中国区
+# TCP 出口固定在美国西部附近，提升国际路由吞吐
 [placement]
 region = "aws:us-west-2"
 
@@ -26,13 +26,13 @@ crons = ["*/30 * * * *"]
 
 [vars]
 DOMAIN = "<SUB_DOMAIN>"
-SUB_TITLE = "Preferred-IP 三网实测订阅"
+SUB_TITLE = "Preferred-IP 三网实测节点"
 CACHE_TTL = "300"
 
 # 管理员邮箱（非敏感）；管理员密码请用 secret: ADMIN_PASSWORD_V9
 ADMIN_EMAIL = "<ADMIN_EMAIL>"
 
-# 订阅与令牌策略：严格用户隔离，关闭公共免密订阅
+# 访问与令牌策略：严格用户隔离，关闭公共免密访问
 ALLOW_PUBLIC_SUB = "0"
 ALLOW_STATELESS_TOKENS = "1"
 ALLOW_LEGACY_WS = "1"

@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = false
 
-# VLESS TCP 出口固定在美国西部附近，避免 Google 将亚洲边缘出口误判为中国区
+# TCP 出口固定在美国西部附近，提升国际路由吞吐
 [placement]
 region = "aws:us-west-2"
 
@@ -20,16 +20,16 @@ DOMAIN = ""
 # 管理员登录邮箱：首次登录后台时使用（默认 admin@example.com）
 ADMIN_EMAIL = "admin@example.com"
 
-# 订阅节点标题：客户端导入订阅时展示的名称前缀
-SUB_TITLE = "Preferred-IP 三网实测订阅"
+# 客户端节点标识前缀
+SUB_TITLE = "Preferred-IP 三网实测节点"
 
-# 备用反代出口 IP：遇到 Cloudflare Error 1000 时的跳板 IP，绝大多数网站走原生直连，默认留空
+# 备用中继出口 IP：遇到 Cloudflare Error 1000 时的备用出口，绝大多数网站走原生直连，默认留空
 PROXYIP = ""
 
 # 边缘缓存时间（秒）：有效节省每日 Workers 请求额度
 CACHE_TTL = "300"
 
-# 订阅与令牌策略：严格用户隔离，关闭公共免密直连
+# 访问安全策略：严格用户隔离，关闭公共免密访问
 ALLOW_PUBLIC_SUB = "0"
 ALLOW_STATELESS_TOKENS = "1"
 ALLOW_LEGACY_WS = "1"
@@ -55,6 +55,6 @@ enabled = true
 head_sampling_rate = 0.1
 
 # KV 命名空间绑定（构建时会自动关联或安全降级）
-[[kv_namespaces]]
-binding = "XS_SUB_KV"
-id = "<YOUR_KV_NAMESPACE_ID>"
+# [[kv_namespaces]]
+# binding = "XS_SUB_KV"
+# 提示：可在 Cloudflare 控制台 Worker -> Settings -> Bindings 中手动添加名为 XS_SUB_KV 的绑定

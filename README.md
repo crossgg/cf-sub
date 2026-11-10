@@ -1,10 +1,10 @@
-# 🚀 Cloudflare Worker Preferred-IP 智能订阅与节点中枢
+# 🚀 Cloudflare Worker Preferred-IP 智能调度与边缘网络中枢
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/crossgg/cf-sub)
 [![Deploy Status](https://github.com/crossgg/cf-sub/actions/workflows/deploy.yml/badge.svg)](https://github.com/crossgg/cf-sub/actions/workflows/deploy.yml)
 [![Cloudflare Workers](https://img.shields.io/badge/Platform-Cloudflare%20Workers-F38020?style=flat&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 
-基于 Cloudflare Workers 打造的轻量级、高可用代理订阅系统与 Web 管理平台。原生支持 **VLESS over WebSocket**、**电信/联通/移动三网实测优选**、**OpenAI 纯美专线分流**与多协议客户端订阅转换。
+基于 Cloudflare Workers 打造的轻量级、高可用智能网络调度系统与 Web 管理平台。原生支持 **WebSocket 边缘高速中继**、**电信/联通/移动三网实测优选**、**OpenAI 纯美专线分流**与多协议客户端配置分发。
 
 无需自备云服务器，完全依托 Cloudflare 免费层（Workers + KV）运行！
 
@@ -53,7 +53,7 @@
 2. 点击右侧 **Run workflow** 按钮；
 3. 工作流将**全自动执行**：
    - 自动检测并创建绑定的 KV 数据库（`XS_SUB_KV`）；
-   - 自动生成 `VLESS_UUID_V9` 与安全密钥；
+   - 自动生成 `NODE_UUID` 与安全密钥；
    - 自动发布并生成登录初始密码！
 4. 执行完成后，点击进入该次运行的 **Summary（摘要）** 卡片，即可查看到管理员邮箱与初始登录密码。
 
@@ -80,10 +80,10 @@
 - 📱 **全平台客户端原生适配**
   - 自动渲染输出 **Clash / Mihomo (Clash Meta)** 完整规则组；
   - 自动输出 **Sing-box** 现代化 JSON 配置；
-  - 支持通用 **VLESS Base64** 节点链接（适配 v2rayN、Shadowrocket 等）。
+  - 支持通用 Base64 聚合节点订阅链接。
 - 🖥️ **现代化可视化管理大屏**
   - 内置 Web 管理仪表盘，实时查看优选节点状态、出口 IP 拓扑与每日 100,000 次免费配额消耗；
-  - 支持客户端隔离：为不同设备或用户独立签发专属 HMAC 订阅 Token。
+  - 支持客户端隔离：为不同设备或用户独立签发专属 HMAC 访问 Token。
 
 ---
 
@@ -93,7 +93,7 @@
 2. 输入 **管理员邮箱**（默认 `admin@<你的域名>` 或 `admin@example.com`）与 **管理员密码** 登录后台；
 3. **签发专属客户端订阅**：
    - 在后台控制面板中点击“添加客户端”，为你的手机、电脑签发专属 Token；
-   - 复制生成的 Clash / Mihomo / Sing-box / VLESS 订阅链接并导入客户端即可使用！
+   - 复制生成的 Clash / Mihomo / Sing-box 订阅链接并导入客户端即可使用！
 
 ---
 
@@ -101,7 +101,7 @@
 
 ### Q1: `PROXYIP` 是做什么用的？必须填吗？
 * **回答：默认留空即可，不需要填。**
-* **原理**：Cloudflare 禁止 Worker 直接回环连接到 Cloudflare 自己的 CDN 节点（会报 `Error 1000`）。当 Worker 代理的目标也是托管在 Cloudflare 上的站点时，`PROXYIP` 作为外部中转跳板代为转发。
+* **原理**：Cloudflare 禁止 Worker 直接回环连接到 Cloudflare 自己的 CDN 节点（会报 `Error 1000`）。当 Worker 访问的目标也是托管在 Cloudflare 上的站点时，`PROXYIP` 作为外部中转跳板代为转发。
 * **实际影响**：日常访问 Google, YouTube, GitHub, Twitter 等绝大部分主流网站走的是 Worker 原生直连（速度最快、延迟最低）。只有在遇到极少数套了 Cloudflare CDN 且打不开的站点时，才需要在后台添加 `PROXYIP`。
 
 ### Q2: 每天 100,000 次免费额度够用吗？

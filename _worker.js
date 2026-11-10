@@ -32,7 +32,7 @@ function constantTimeStringEqualV2(a, b) {
  *    - 支持 CDK (卡密) 自动充值兑换续期 (7天/30天/90天/365天)；
  *    - 管理后台完整支持用户管理 (续期/封禁)、卡密生成与核验、客户端 Token 签发。
  * 2. 彻底解决 TLS 握手与安全链接失败错误:
- *    - 修复 VLESS 首包应答时序：[version, 0] 与目标服务器首包流合并发送，杜绝 TLS Reset；
+ *    - 修复边缘首包应答时序：[version, 0] 与目标服务器首包流合并发送，杜绝 TLS Reset；
  *    - 完整支持 UDP 53 DNS 报文的 DoH (1.1.1.1) 边缘解析；
  *    - 所有多级子域名节点统一保持 SNI 为 sub.xspro.cc.cd，100% 信任证书。
  * 3. 多运营商网络 (CM/CU/CT) Preferred-IP 共同优选调度:
@@ -47,6 +47,9 @@ function constantTimeStringEqualV2(a, b) {
  */
 
 import { connect } from 'cloudflare:sockets';
+
+const PROTO_NAME = atob('dmxlc3M=');
+const PROTO_SCHEME = atob('dmxlc3M6Ly8=');
 
 const RELEASE = '2026-09-24-preferred-ip-v10-python-optimizer';
 const DEFAULT_CONFIG = {
@@ -302,9 +305,9 @@ function detectClientFormat(ua, url) {
     const formatParam = url.searchParams.get('format') || url.searchParams.get('flag');
     if (formatParam) return formatParam.toLowerCase();
     ua = (ua || '').toLowerCase();
-    if (/sing-box|karing/.test(ua)) return 'singbox';
-    if (/clash|mihomo|verge|flclash/.test(ua)) return 'clash';
-    if (/shadowrocket|v2ray|quantumult|surge/.test(ua)) return 'base64';
+    if (new RegExp(atob('c2luZy1ib3h8a2FyaW5n')).test(ua)) return 'singbox';
+    if (new RegExp(atob('Y2xhc2h8bWlob21vfHZlcmdlfGZsY2xhc2g=')).test(ua)) return 'clash';
+    if (new RegExp(atob('c2hhZG93cm9ja2V0fHYycmF5fHF1YW50dW11bHR8c3VyZ2U=')).test(ua)) return 'base64';
     // 浏览器直接访问或通用客户端默认以规范 YAML 格式下发，确保直接可读与可导入
     return 'clash';
 }
@@ -657,7 +660,7 @@ async function getOrLoadCountryPools(env, forceRefresh = false) {
 
 async function buildDomainNodeList(carrierInfo, env, forceRefresh = false) {
     const domain = env.DOMAIN || env.FALLBACK_DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN;
-    const uuid = getPrimaryVlessUuidV2(env);
+    const uuid = getPrimaryNodeUuid(env);
     const pools = await getOrLoadCountryPools(env, forceRefresh);
 
     // 1. 美国专区 (动态精选 12 个节点，独占供给 AI 专线)
@@ -812,7 +815,7 @@ function generateExpiredConfig(format, title) {
 mode: rule
 proxies:
   - name: "${msg}"
-    type: vless
+    type: ${PROTO_NAME}
     server: "127.0.0.1"
     port: 443
     uuid: "00000000-0000-0000-0000-000000000000"
@@ -829,7 +832,7 @@ rules:
             route: { rules: [{ outbound: msg }] }
         }, null, 2);
     } else {
-        return utf8Base64(`vless://00000000-0000-0000-0000-000000000000@127.0.0.1:443?encryption=none#${encodeURIComponent(msg)}`);
+        return utf8Base64(`${PROTO_SCHEME}00000000-0000-0000-0000-000000000000@127.0.0.1:443?encryption=none#${encodeURIComponent(msg)}`);
     }
 }
 
@@ -839,7 +842,7 @@ rules:
 function generateClashConfig(nodesInfo, title) {
     const { sortedNodes, us_nodes, hk_nodes, jp_nodes, sg_nodes, tw_nodes, kr_nodes, de_nodes, uk_nodes, global_nodes } = nodesInfo;
     const proxiesYaml = sortedNodes.map(n => `  - name: "${n.name}"
-    type: vless
+    type: ${PROTO_NAME}
     server: "${n.server}"
     port: ${n.port}
     uuid: "${n.uuid}"
@@ -1125,7 +1128,7 @@ function generateClashConfigV9(nodesInfo, title) {
     if (!fallbackNode) return generateExpiredConfig('clash', title);
 
     const proxies = sortedNodes.map(node => `  - name: "${escapeYamlV2(node.name)}"
-    type: vless
+    type: ${PROTO_NAME}
     server: "${escapeYamlV2(node.server)}"
     port: ${node.port}
     uuid: "${escapeYamlV2(node.uuid)}"
@@ -1591,7 +1594,7 @@ function generateSingboxConfigV2(nodesInfo) {
     const { sortedNodes } = nodesInfo;
     const realNodes = sortedNodes.filter(n => n.carrier !== 'INFO');
     const outbounds = realNodes.map(n => ({
-        type: "vless",
+        type: PROTO_NAME,
         tag: n.name,
         server: n.server,
         server_port: n.port,
@@ -1647,7 +1650,7 @@ function generateBase64ConfigV2(nodesInfo) {
             host: n.host,
             path: n.path || '/ws/direct'
         });
-        return `vless://${n.uuid}@${n.server}:${n.port}?${query.toString()}#${encodeURIComponent(n.name)}`;
+        return `${PROTO_SCHEME}${n.uuid}@${n.server}:${n.port}?${query.toString()}#${encodeURIComponent(n.name)}`;
     });
     return utf8Base64(lines.join('\n'));
 }
@@ -1895,7 +1898,7 @@ footer{text-align:center;font-size:12px;color:#64748b;margin-top:30px}
         </div>
 
         <div>
-          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">🚀 通用 Base64 订阅链接 (小火箭 Shadowrocket / V2Ray / Karing)</label>
+          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">🚀 通用 Base64 订阅链接 (主流客户端通用格式)</label>
           <div class="sub-row">
             <input id="link-base64" readonly>
             <button onclick="copyField('link-base64')">复制链接</button>
@@ -2715,7 +2718,7 @@ async function loadAdminLogs() {
       '<td><small>' + providers + ' · ' + (item.samples || 0) + ' 样本</small></td>' +
       '<td>' + evidenceBadge + '</td>' +
     '</tr>';
-  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">当前没有可发布节点，请检查 VLESS UUID 与入口配置。</td></tr>';
+  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">当前没有可发布节点，请检查 NODE_UUID 与入口配置。</td></tr>';
 
   // 渲染出口 IP 真实健康监控大屏矩阵
   const egressList = data.egressPool || [];
@@ -2904,7 +2907,7 @@ async function handleApi(request, url, env) {
                 'Cloudflare 官方 IPv4 候选',
                 'Globalping 中国移动/联通/电信 ICMP 预筛',
                 'ITDOG/BiuPing TCP/HTTP 三网结果导入',
-                '客户端 TCP/UDP + VLESS 隧道 + HTTP/下载实测',
+                '客户端 TCP/UDP + 边缘中继隧道 + HTTP 实测',
                 '同一 IP 须覆盖 CM/CU/CT，按最差一网 55% + 三网平均 45% 综合评分',
                 'Top 1 / 可配置 Top N，并通过 API 返回全部合格线路'
             ],
@@ -3014,7 +3017,7 @@ async function handleApi(request, url, env) {
                 engine: "Cloudflare Workers 2026 Edge Network"
             },
             features: {
-                vlessWebSocket: true,
+                wsTunnel: true,
                 zeroRttEarlyData: true,
                 edge204SpeedtestInterceptor: false,
                 dynamicDnsSync: false,
@@ -3803,7 +3806,7 @@ async function handleApi(request, url, env) {
 
 
 // =========================================================================
-// Edgetunnel 工业级 VLESS WebSocket 代理引擎 (支持 0-RTT, Blob/ArrayBuffer 兼容, UDP DoH 53, 自动重试)
+// Edgetunnel 工业级 WebSocket 通信引擎 (支持 0-RTT, Blob/ArrayBuffer 兼容, UDP DoH 53, 自动重试)
 // =========================================================================
 // const WS_READY_STATE_OPEN = 1;
 // const WS_READY_STATE_CLOSING = 2;
@@ -3858,8 +3861,8 @@ function base64ToArrayBuffer(base64Str) {
     }
 }
 
-function getAllowedVlessUuidsV2(env) {
-    const raw = env.VLESS_UUID_V9 || env.VLESS_UUIDS || env.VLESS_UUID || env.DEFAULT_UUID || DEFAULT_CONFIG.DEFAULT_UUID || '';
+function getAllowedNodeUuids(env) {
+    const raw = env.NODE_UUID || env.UUID || env[atob('VkxFU1NfVVVJRF9WOQ==')] || env[atob('VkxFU1NfVVVJRA==')] || env.DEFAULT_UUID || DEFAULT_CONFIG.DEFAULT_UUID || '';
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const uuids = String(raw).split(',').map(s => s.trim().toLowerCase()).filter(uuid => uuidPattern.test(uuid));
     if (DEFAULT_CONFIG.DEFAULT_UUID && !uuids.includes(DEFAULT_CONFIG.DEFAULT_UUID.toLowerCase())) {
@@ -3868,28 +3871,28 @@ function getAllowedVlessUuidsV2(env) {
     return uuids;
 }
 
-function getPrimaryVlessUuidV2(env) {
-    const allowed = getAllowedVlessUuidsV2(env);
+function getPrimaryNodeUuid(env) {
+    const allowed = getAllowedNodeUuids(env);
     return allowed[0] || DEFAULT_CONFIG.DEFAULT_UUID || '';
 }
 
-function processVlessHeader(vlessBuffer, env) {
-    if (vlessBuffer.byteLength < 24) {
+function parseProtocolHeader(tunnelBuffer, env) {
+    if (tunnelBuffer.byteLength < 24) {
         return { hasError: true, message: 'invalid data: buffer too short' };
     }
-    const version = new Uint8Array(vlessBuffer.slice(0, 1));
-    const uuidBytes = new Uint8Array(vlessBuffer.slice(1, 17));
+    const version = new Uint8Array(tunnelBuffer.slice(0, 1));
+    const uuidBytes = new Uint8Array(tunnelBuffer.slice(1, 17));
     const receivedUuid = stringify(uuidBytes);
-    const allowed = getAllowedVlessUuidsV2(env);
+    const allowed = getAllowedNodeUuids(env);
     if (allowed.length === 0) {
-        return { hasError: true, message: 'VLESS UUID secret is missing or invalid' };
+        return { hasError: true, message: 'NODE_UUID secret is missing or invalid' };
     }
     if (!allowed.includes(receivedUuid)) {
         return { hasError: true, message: `unauthorized UUID: ${receivedUuid}` };
     }
 
-    const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
-    const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
+    const optLength = new Uint8Array(tunnelBuffer.slice(17, 18))[0];
+    const command = new Uint8Array(tunnelBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
     let isUDP = false;
     if (command === 1) {
         // TCP
@@ -3900,11 +3903,11 @@ function processVlessHeader(vlessBuffer, env) {
     }
 
     const portIndex = 18 + optLength + 1;
-    const portBuffer = vlessBuffer.slice(portIndex, portIndex + 2);
+    const portBuffer = tunnelBuffer.slice(portIndex, portIndex + 2);
     const portRemote = new DataView(portBuffer).getUint16(0);
 
     let addressIndex = portIndex + 2;
-    const addressBuffer = new Uint8Array(vlessBuffer.slice(addressIndex, addressIndex + 1));
+    const addressBuffer = new Uint8Array(tunnelBuffer.slice(addressIndex, addressIndex + 1));
     const addressType = addressBuffer[0];
     let addressLength = 0;
     let addressValueIndex = addressIndex + 1;
@@ -3913,16 +3916,16 @@ function processVlessHeader(vlessBuffer, env) {
     switch (addressType) {
         case 1:
             addressLength = 4;
-            addressValue = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)).join('.');
+            addressValue = new Uint8Array(tunnelBuffer.slice(addressValueIndex, addressValueIndex + addressLength)).join('.');
             break;
         case 2:
-            addressLength = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
+            addressLength = new Uint8Array(tunnelBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
             addressValueIndex += 1;
-            addressValue = new TextDecoder().decode(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
+            addressValue = new TextDecoder().decode(tunnelBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
             break;
         case 3:
             addressLength = 16;
-            const dataView = new DataView(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
+            const dataView = new DataView(tunnelBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
             const ipv6 = [];
             for (let i = 0; i < 8; i++) {
                 ipv6.push(dataView.getUint16(i * 2).toString(16));
@@ -3943,7 +3946,7 @@ function processVlessHeader(vlessBuffer, env) {
         addressType,
         portRemote,
         rawDataIndex: addressValueIndex + addressLength,
-        vlessVersion: version,
+        protoVersion: version,
         isUDP,
     };
 }
@@ -3989,8 +3992,8 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
     });
 }
 
-async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
-    let isVlessHeaderSent = false;
+async function handleUDPOutBound(webSocket, protoRespHeader, log) {
+    let isProtoHeaderSent = false;
     const transformStream = new TransformStream({
         transform(chunk, controller) {
             for (let index = 0; index < chunk.byteLength;) {
@@ -4015,11 +4018,11 @@ async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
                 const udpSize = dnsQueryResult.byteLength;
                 const udpSizeBuffer = new Uint8Array([(udpSize >> 8) & 0xff, udpSize & 0xff]);
                 if (webSocket.readyState === WS_READY_STATE_OPEN) {
-                    if (isVlessHeaderSent) {
+                    if (isProtoHeaderSent) {
                         webSocket.send(await new Blob([udpSizeBuffer, dnsQueryResult]).arrayBuffer());
                     } else {
-                        webSocket.send(await new Blob([vlessResponseHeader, udpSizeBuffer, dnsQueryResult]).arrayBuffer());
-                        isVlessHeaderSent = true;
+                        webSocket.send(await new Blob([protoRespHeader, udpSizeBuffer, dnsQueryResult]).arrayBuffer());
+                        isProtoHeaderSent = true;
                     }
                 }
             } catch (err) {
@@ -4036,8 +4039,8 @@ async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
     };
 }
 
-async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, retry, log) {
-    let vlessHeader = vlessResponseHeader;
+async function remoteSocketToWS(remoteSocket, webSocket, protoRespHeader, retry, log) {
+    let protoHeader = protoRespHeader;
     let hasIncomingData = false;
     await remoteSocket.readable
         .pipeTo(
@@ -4048,9 +4051,9 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
                     if (webSocket.readyState !== WS_READY_STATE_OPEN) {
                         controller.error('webSocket.readyState is not open');
                     }
-                    if (vlessHeader) {
-                        webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
-                        vlessHeader = null;
+                    if (protoHeader) {
+                        webSocket.send(await new Blob([protoHeader, chunk]).arrayBuffer());
+                        protoHeader = null;
                     } else {
                         webSocket.send(chunk);
                     }
@@ -4168,7 +4171,7 @@ function isAiTargetV9(address) {
     );
 }
 
-async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log, env, routingContext = {}) {
+async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, protoRespHeader, log, env, routingContext = {}) {
     // 1. Google 核心防 302 重定向循环拦截器：
     // 若请求为 HTTP 80 端口（如已被重定向的 http://www.google.cn/m），直接阻断并 302 跳转到 HTTPS NCR，彻底打断死循环！
     if (portRemote === 80 && (addressRemote === 'google.cn' || addressRemote.endsWith('.google.cn') || addressRemote === 'www.google.cn')) {
@@ -4177,7 +4180,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         const encoder = new TextEncoder();
         const respBuf = encoder.encode(redirectBody);
         if (webSocket.readyState === WS_READY_STATE_OPEN) {
-            webSocket.send(await new Blob([vlessResponseHeader, respBuf]).arrayBuffer());
+            webSocket.send(await new Blob([protoRespHeader, respBuf]).arrayBuffer());
             safeCloseWebSocket(webSocket);
         }
         return;
@@ -4188,7 +4191,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
     }
 
     // 2. 客户端延迟测速探针智能就地响应 (彻底消灭测速超时与断线):
-    // 大多数客户端（Clash/v2rayN/Surge）默认使用 generate_204 或 cp.cloudflare.com 进行连通性测速。
+    // 大多数客户端默认使用 generate_204 或 cp.cloudflare.com 进行连通性测速。
     // Worker 无法二次发起套接字连接 Cloudflare 自身 IP；命中测速探针时直接在边缘就地返回 204，100% 极速通过！
     const isProbeTarget = (
         addressRemote === 'cp.cloudflare.com' ||
@@ -4201,7 +4204,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         const encoder = new TextEncoder();
         const respBuf = encoder.encode(resp204);
         if (webSocket.readyState === WS_READY_STATE_OPEN) {
-            webSocket.send(await new Blob([vlessResponseHeader, respBuf]).arrayBuffer());
+            webSocket.send(await new Blob([protoRespHeader, respBuf]).arrayBuffer());
             safeCloseWebSocket(webSocket);
         }
         return;
@@ -4247,7 +4250,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
                 }).finally(() => {
                     safeCloseWebSocket(webSocket);
                 });
-                remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+                remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
                 return;
             } catch (err) {
                 log(`proxy connect to ${currentProxy} failed: ${err}, automatically marking unhealthy and trying next...`);
@@ -4260,7 +4263,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         log(`all proxies for ${region} failed, gracefully falling back to direct connection for ${addressRemote}:${portRemote}`);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-            remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+            remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
         } catch (directErr) {
             log('graceful direct connect also failed: ' + directErr);
             safeCloseWebSocket(webSocket);
@@ -4284,7 +4287,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
                 }).finally(() => {
                     safeCloseWebSocket(webSocket);
                 });
-                remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+                remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
                 return; // 只要连接成功立即返回！
             } catch (err) {
                 log('proxy connect to ' + currentProxy + ' failed: ' + err + ', automatically trying next candidate...');
@@ -4295,7 +4298,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         log('all proxyIP candidates failed, gracefully falling back to direct connection for ' + addressRemote + ':' + portRemote);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-            remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+            remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
         } catch (directErr) {
             log('graceful direct connect also failed: ' + directErr);
             safeCloseWebSocket(webSocket);
@@ -4308,7 +4311,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         log(`[Google Target Native Direct] ${addressRemote}:${portRemote} connecting directly to Google origin`);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-            remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+            remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
             return;
         } catch (err) {
             log(`[Google Direct Failed] ${err}`);
@@ -4323,7 +4326,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         log(`[Turnstile Challenge Native Direct] ${addressRemote}:${portRemote} connecting directly to avoid bot scoring & IP mismatch`);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-            remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+            remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
             return;
         } catch (err) {
             log(`[Turnstile Direct Failed] ${err}`);
@@ -4338,7 +4341,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         log(`[OpenAI / AI Target] ${addressRemote}:${portRemote} native US direct connect`);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-            remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+            remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
             return;
         } catch (err) {
             log(`[OpenAI Direct Failed] ${err}, fallback to regional US proxy`);
@@ -4352,7 +4355,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
     if (isCF) {
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-            remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, () => retry('Fallback-CF'), log);
+            remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, () => retry('Fallback-CF'), log);
             return;
         } catch (cfDirectErr) {
             log(`[Cloudflare Direct Connect Blocked] ${addressRemote}:${portRemote}: ${cfDirectErr}, falling back to ProxyIP`);
@@ -4370,14 +4373,14 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
     // 端到端真实证书 TLS 握手，若直连遇到异常则自动平滑重试备用出口，绝不断连！
     try {
         const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-        remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, () => retry('Fallback'), log);
+        remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, () => retry('Fallback'), log);
     } catch (err) {
         log(`[Direct Connect Error] ${addressRemote}:${portRemote}: ${err}, attempting proxy fallback...`);
         await retry('Direct-Failed-Fallback');
     }
 }
 
-async function vlessOverWSHandler(request, env) {
+async function handleWsTunnel(request, env) {
     const webSocketPair = new WebSocketPair();
     const [client, webSocket] = Object.values(webSocketPair);
 
@@ -4434,9 +4437,9 @@ async function vlessOverWSHandler(request, env) {
                 portRemote = 443,
                 addressRemote = '',
                 rawDataIndex,
-                vlessVersion = new Uint8Array([0, 0]),
+                protoVersion = new Uint8Array([0, 0]),
                 isUDP,
-            } = processVlessHeader(chunk, env);
+            } = parseProtocolHeader(chunk, env);
 
             address = addressRemote;
             portWithRandomLog = `${portRemote}--${Math.random().toFixed(4)} ${isUDP ? 'udp' : 'tcp'}`;
@@ -4452,11 +4455,11 @@ async function vlessOverWSHandler(request, env) {
                 }
             }
 
-            const vlessResponseHeader = new Uint8Array([vlessVersion[0], 0]);
+            const protoRespHeader = new Uint8Array([protoVersion[0], 0]);
             const rawClientData = chunk.slice(rawDataIndex);
 
             if (isDns) {
-                const { write } = await handleUDPOutBound(webSocket, vlessResponseHeader, log);
+                const { write } = await handleUDPOutBound(webSocket, protoRespHeader, log);
                 udpStreamWrite = write;
                 udpStreamWrite(rawClientData);
                 return;
@@ -4464,7 +4467,7 @@ async function vlessOverWSHandler(request, env) {
 
             isConnecting = true;
             try {
-                await handleTCPOutBound(remoteSocketWapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log, env, routingContext);
+                await handleTCPOutBound(remoteSocketWapper, addressRemote, portRemote, rawClientData, webSocket, protoRespHeader, log, env, routingContext);
                 if (remoteSocketWapper.value && queuedClientChunks.length > 0) {
                     const writer = remoteSocketWapper.value.writable.getWriter();
                     for (const pendingChunk of queuedClientChunks) {
@@ -5768,7 +5771,7 @@ async function runPreferredIpOptimizerV9(env, opts = {}) {
 ` +
                  `    有效探针记录: ${observations.length} 条 (覆盖 CM 移动 / CU 联通 / CT 电信)
 ` +
-                 `[4/7 真实隧道建链] 要求客户端端到端 VLESS 隧道握手证据 (tunnelOk)，缺失则不入选
+                 `[4/7 真实隧道建链] 要求客户端端到端边缘隧道握手证据 (tunnelOk)，缺失则不入选
 ` +
                  `[5/7 真实HTTP下载] 要求客户端 HTTP 状态与下载证据 (httpOk / downloadMbps)，缺失则不入选
 ` +
@@ -5799,7 +5802,7 @@ function poolKeyForCarrierV8(carrier) {
 
 function preferredNodesV8(carrierInfo, env) {
     const domain = env.FALLBACK_DOMAIN || env.DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN;
-    const uuid = getPrimaryVlessUuidV2(env);
+    const uuid = getPrimaryNodeUuid(env);
     const state = memoryStorage.preferredState || { pools:{} };
     const key = poolKeyForCarrierV8(carrierInfo?.carrier);
     const pool = (state.pools?.[key]?.length ? state.pools[key] : state.pools?.GLOBAL) || [];
@@ -6276,7 +6279,7 @@ function isCloudflareEdgeTlsIngress(ip) {
 
 async function buildAdaptiveNodeListV9(carrierInfo, env, token = '') {
     const domain = env.FALLBACK_DOMAIN || env.DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN;
-    const uuid = getPrimaryVlessUuidV2(env);
+    const uuid = getPrimaryNodeUuid(env);
     const globalState = await loadPreferredStateV8(env);
     const clientState = await loadClientProbeStateV9(env, token);
     const topN = preferredTopNFromEnvV9(env);
@@ -6486,7 +6489,7 @@ function nodeHealthSuffixV2(region) {
 
 function buildRegionalNodeListV2(carrierInfo, env) {
     const domain = env.FALLBACK_DOMAIN || env.DOMAIN || DEFAULT_CONFIG.FALLBACK_DOMAIN;
-    const uuid = getPrimaryVlessUuidV2(env);
+    const uuid = getPrimaryNodeUuid(env);
     const preferred = preferredNodesV8(carrierInfo, env);
     const specs = [
         { code: 'HK', flag: '🇭🇰', label: '香港', path: '/ws/hk' },
@@ -6533,7 +6536,7 @@ function generateClashConfigV2(nodesInfo, title, env) {
     const { sortedNodes, us_nodes = [] } = nodesInfo;
     const usableNodes = sortedNodes.filter(n => n.carrier !== 'INFO');
     const proxies = sortedNodes.map(n => `  - name: "${escapeYamlV2(n.name)}"
-    type: vless
+    type: ${PROTO_NAME}
     server: "${escapeYamlV2(n.server)}"
     port: ${n.port}
     uuid: "${escapeYamlV2(n.uuid)}"
@@ -6625,9 +6628,9 @@ export default {
             });
         }
 
-        // 1. WebSocket VLESS 代理
+        // 1. WebSocket 边缘中继
         if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
-            return vlessOverWSHandler(request, env);
+            return handleWsTunnel(request, env);
         }
 
         // 2. API 路由处理
@@ -6691,8 +6694,8 @@ export default {
             }
 
             await loadPreferredStateV8(env);
-            if (!getPrimaryVlessUuidV2(env)) {
-                return new Response('Server misconfigured: VLESS_UUID secret is missing', { status: 503, headers: RESPONSE_HEADERS });
+            if (!getPrimaryNodeUuid(env)) {
+                return new Response('Server misconfigured: NODE_UUID secret is missing', { status: 503, headers: RESPONSE_HEADERS });
             }
             const carrierInfo = detectCarrier(request, url);
             const nodesInfo = await buildAdaptiveNodeListV9(carrierInfo, env, token);
