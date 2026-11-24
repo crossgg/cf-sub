@@ -16,7 +16,7 @@
 3. 选择 **Edit Cloudflare Workers** 模板完成创建，并复制生成的 Token 字符串。
 
    可选配置：
-   * **`PROXYIP`**：备用出口 IP（留空直连）
+   * **`RELAY_IP`**：备用出口 IP（留空直连）
    * **`NODE_UUID`**：客户端通信识别码（留空自动生成）
 
 ### 2. 在 GitHub 仓库设置 Secrets
@@ -75,8 +75,8 @@ npm run deploy
 
 ## 常见问题与说明
 
-1. **什么是 `PROXYIP`？**
-   * `PROXYIP` 是 Worker 的备用出口。当 Worker 访问的目标也是托管在 Cloudflare 上的站点时，Cloudflare 官方会触发 Error 1000 自身回环限制。此时 Worker 会通过 `PROXYIP` 转发。
+1. **什么是 `RELAY_IP`？**
+   * `RELAY_IP` 是 Worker 的备用中继出口（同时兼容旧变量名 `PROXYIP`）。当 Worker 访问的目标也是托管在 Cloudflare 上的站点时，Cloudflare 官方会触发 Error 1000 自身回环限制。此时 Worker 会通过 `RELAY_IP` 转发。
    * 日常访问绝大多数主流网站均走原生直连，因此默认留空即可。
 2. **首次登录后台**：
    * 浏览器访问 `https://<你的域名>/`，使用邮箱（`admin@<你的域名>` 或 `admin@example.com`）与初始密码登录。

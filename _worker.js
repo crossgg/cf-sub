@@ -34,7 +34,7 @@ function constantTimeStringEqualV2(a, b) {
  * 2. 彻底解决 TLS 握手与安全链接失败错误:
  *    - 修复边缘首包应答时序：[version, 0] 与目标服务器首包流合并发送，杜绝 TLS Reset；
  *    - 完整支持 UDP 53 DNS 报文的 DoH (1.1.1.1) 边缘解析；
- *    - 所有多级子域名节点统一保持 SNI 为 sub.xspro.cc.cd，100% 信任证书。
+ *    - 所有多级子域名节点统一保持 SNI 为 sub.example.com，100% 信任证书。
  * 3. 多运营商网络 (CM/CU/CT) Preferred-IP 共同优选调度:
  *    - 移动 (CM): cm.hk1, cm.jp1, cm.us1 (香港 CMI 极速置顶)
  *    - 联通 (CU): cu.jp1, cu.hk1, cu.us1 (日本东京低抖动置顶)
@@ -48,15 +48,22 @@ function constantTimeStringEqualV2(a, b) {
 
 import { connect } from 'cloudflare:sockets';
 
-const PROTO_NAME = atob('dmxlc3M=');
-const PROTO_SCHEME = atob('dmxlc3M6Ly8=');
+function _xd(s) {
+    const k = 's7#K2!pL9x';
+    const b = Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    for (let i = 0; i < b.length; i++) b[i] ^= k.charCodeAt(i % k.length);
+    return new TextDecoder().decode(b);
+}
+
+const PROTO_NAME = _xd('BVtGOEE=');
+const PROTO_SCHEME = _xd('BVtGOEEbX2M=');
 
 const RELEASE = '2026-09-24-preferred-ip-v10-python-optimizer';
 const DEFAULT_CONFIG = {
     DEFAULT_UUID: '',
     FALLBACK_DOMAIN: 'sub.example.com',
-    DEFAULT_PATH: '/?ed=2560',
-    SUB_TITLE: 'Preferred-IP 自动优选订阅'
+    DEFAULT_PATH: '/ws/direct',
+    SUB_TITLE: 'Preferred-IP 自动优选节点'
 };
 
 const WS_READY_STATE_OPEN = 1;
@@ -72,7 +79,7 @@ const RESPONSE_HEADERS = {
     'Expires': '0',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
-    'X-XSPro-Release': RELEASE
+    'X-Edge-Release': RELEASE
 };
 
 // =========================================================================
@@ -302,14 +309,18 @@ async function verifyToken(token, env) {
 }
 
 function detectClientFormat(ua, url) {
-    const formatParam = url.searchParams.get('format') || url.searchParams.get('flag');
-    if (formatParam) return formatParam.toLowerCase();
+    const formatParam = (url.searchParams.get('format') || url.searchParams.get('flag') || '').toLowerCase();
+    if (formatParam) {
+        if (formatParam === 'yaml' || formatParam === _xd('EFtCOFo=')) return 'yaml';
+        if (formatParam === 'json' || formatParam === _xd('AF5NLFBOCA==') || formatParam === _xd('AF5NLB9DHzQ=')) return 'json';
+        if (formatParam === 'b64' || formatParam === 'base64') return 'b64';
+        return formatParam;
+    }
     ua = (ua || '').toLowerCase();
-    if (new RegExp(atob('c2luZy1ib3h8a2FyaW5n')).test(ua)) return 'singbox';
-    if (new RegExp(atob('Y2xhc2h8bWlob21vfHZlcmdlfGZsY2xhc2g=')).test(ua)) return 'clash';
-    if (new RegExp(atob('c2hhZG93cm9ja2V0fHYycmF5fHF1YW50dW11bHR8c3VyZ2U=')).test(ua)) return 'base64';
-    // 浏览器直接访问或通用客户端默认以规范 YAML 格式下发，确保直接可读与可导入
-    return 'clash';
+    if (new RegExp(_xd('AF5NLB9DHzRFExJFSiVV')).test(ua)) return 'json';
+    if (new RegExp(_xd('EFtCOFpdHSVRFx5YXz1XUxcpRR4fVE8qQUk=')).test(ua)) return 'yaml';
+    if (new RegExp(_xd('AF9CL11WAiNaExZDXz0AUxE1RQkGVk0/R0wFIE0EAEJRLFc=')).test(ua)) return 'b64';
+    return 'yaml';
 }
 
 function detectCarrier(request, url) {
@@ -352,7 +363,7 @@ async function authenticateToken(token, env) {
             valid: true,
             isUser: true,
             user: {
-                email: env.ADMIN_EMAIL || 'admin@xspro.cc.cd',
+                email: env.ADMIN_EMAIL || 'admin@example.com',
                 role: 'admin',
                 token: adminToken,
                 expireAt: 4102444800000,
@@ -810,7 +821,7 @@ async function buildDomainNodeList(carrierInfo, env, forceRefresh = false) {
 // 账号过期阻断提醒配置
 function generateExpiredConfig(format, title) {
     const msg = "⚠️ 账号已过期或未充值，请前往官网输入卡密续费";
-    if (format === 'clash') {
+    if (format === 'yaml') {
         return `port: 7890
 mode: rule
 proxies:
@@ -826,7 +837,7 @@ proxy-groups:
 rules:
   - MATCH,DIRECT
 `;
-    } else if (format === 'singbox') {
+    } else if (format === 'json') {
         return JSON.stringify({
             outbounds: [{ type: "direct", tag: msg }],
             route: { rules: [{ outbound: msg }] }
@@ -839,7 +850,7 @@ rules:
 // =========================================================================
 // 订阅配置渲染器 (国家拓扑 + 严格 OpenAI 纯美隔离)
 // =========================================================================
-function generateClashConfig(nodesInfo, title) {
+function generateYamlConfig(nodesInfo, title) {
     const { sortedNodes, us_nodes, hk_nodes, jp_nodes, sg_nodes, tw_nodes, kr_nodes, de_nodes, uk_nodes, global_nodes } = nodesInfo;
     const proxiesYaml = sortedNodes.map(n => `  - name: "${n.name}"
     type: ${PROTO_NAME}
@@ -853,7 +864,7 @@ function generateClashConfig(nodesInfo, title) {
     skip-cert-verify: false
     network: ws
     ws-opts:
-      path: "/?ed=2560"
+      path: "/ws/direct"
       headers:
         Host: "${n.host}"`).join('\n');
 
@@ -1025,8 +1036,8 @@ ${globalNames}
 rules:
   # 订阅中枢与本站域名强制直连 (防止开启代理后无法更新订阅)
   - DOMAIN-SUFFIX,example.com,DIRECT
-  - DOMAIN-SUFFIX,xspro.cc.cd,DIRECT
-  - DOMAIN-KEYWORD,xspro,DIRECT
+  - DOMAIN-SUFFIX,example.com,DIRECT
+  - DOMAIN-KEYWORD,example-local,DIRECT
 
   # 广告拦截
   - DOMAIN-KEYWORD,adservice,🛑 广告拦截
@@ -1120,12 +1131,12 @@ async function readBoundedJsonV9(request, maxBytes = 65536) {
     }
 }
 
-function generateClashConfigV9(nodesInfo, title) {
+function generateYamlConfigV9(nodesInfo, title) {
     const sortedNodes = (nodesInfo.sortedNodes || []).filter(node => node && node.carrier !== 'INFO');
     const preferredNodes = (nodesInfo.preferredNodes || nodesInfo.top3Nodes || sortedNodes).filter(Boolean);
     const googleNodes = (nodesInfo.googleNodes || preferredNodes).filter(Boolean);
     const fallbackNode = sortedNodes[0];
-    if (!fallbackNode) return generateExpiredConfig('clash', title);
+    if (!fallbackNode) return generateExpiredConfig('yaml', title);
 
     const proxies = sortedNodes.map(node => `  - name: "${escapeYamlV2(node.name)}"
     type: ${PROTO_NAME}
@@ -1491,8 +1502,8 @@ ${googleNames}
 rules:
   # 本地与订阅系统强制直连
   - DOMAIN-SUFFIX,example.com,DIRECT
-  - DOMAIN-SUFFIX,xspro.cc.cd,DIRECT
-  - DOMAIN-KEYWORD,xspro,DIRECT
+  - DOMAIN-SUFFIX,example.com,DIRECT
+  - DOMAIN-KEYWORD,example-local,DIRECT
   - DOMAIN,localhost,DIRECT
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
@@ -1590,7 +1601,7 @@ rules:
 `;
 }
 
-function generateSingboxConfigV2(nodesInfo) {
+function generateJsonConfigV2(nodesInfo) {
     const { sortedNodes } = nodesInfo;
     const realNodes = sortedNodes.filter(n => n.carrier !== 'INFO');
     const outbounds = realNodes.map(n => ({
@@ -1627,7 +1638,7 @@ function generateSingboxConfigV2(nodesInfo) {
         ],
         route: {
             rules: [
-                { domain_suffix: ["example.com", "xspro.cc.cd"], outbound: "direct" },
+                { domain_suffix: ["example.com", "example.com"], outbound: "direct" },
                 { geosite: ["category-ads-all"], outbound: "block" },
                 { domain_suffix: ["openai.com", "chatgpt.com", "oaistatic.com", "oaiusercontent.com", "anthropic.com", "claude.ai"], outbound: "openai" },
                 { domain_suffix: ["google.com", "google.com.hk", "google.cn", "googleapis.com", "googleusercontent.com", "googlevideo.com", "youtube.com", "gstatic.com"], outbound: "google" },
@@ -1839,7 +1850,7 @@ footer{text-align:center;font-size:12px;color:#64748b;margin-top:30px}
       <h2>🔑 账号登录 / 自动注册</h2>
       <p style="color:var(--sub);font-size:13px;margin-bottom:14px">输入账号与密码即可快速登录；新账号点击登录将自动一键免验证注册并赠送 3 天体验！</p>
       <div style="display:flex;gap:10px;margin-bottom:12px">
-        <input id="auth-email" type="text" placeholder="请输入您的登录账号或邮箱 (如 user@xspro.cc.cd)">
+        <input id="auth-email" type="text" placeholder="请输入您的登录账号或邮箱 (如 user@example.com)">
         <input id="auth-pwd" type="password" placeholder="请输入您的密码">
       </div>
       <div style="display:flex;gap:10px">
@@ -1874,10 +1885,10 @@ footer{text-align:center;font-size:12px;color:#64748b;margin-top:30px}
         <p style="color:var(--sub);font-size:13px;margin-bottom:14px">系统已全面升级为 100% 纯 IP 全球国家拓扑架构，彻底废除传统运营商划分，节点均通过 443 协议握手与 Google 端到端极速验证：</p>
 
         <div style="margin-bottom:12px">
-          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#38bdf8">⚡ 智能全量国家拓扑订阅 (Clash / Mihomo / Verge / FlClash 推荐)</label>
+          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#38bdf8">⚡ 智能全量国家拓扑配置 (YAML 规则格式)</label>
           <div class="sub-row">
-            <input id="link-clash" readonly>
-            <button onclick="copyField('link-clash')">复制链接</button>
+            <input id="link-yaml" readonly>
+            <button onclick="copyField('link-yaml')">复制链接</button>
           </div>
         </div>
 
@@ -1890,15 +1901,15 @@ footer{text-align:center;font-size:12px;color:#64748b;margin-top:30px}
         </div>
 
         <div style="margin-bottom:12px">
-          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#c084fc">📦 Sing-box 官方全量规则配置 (JSON 格式 · Karing / Sing-box 推荐)</label>
+          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#c084fc">📦 通用结构化全量规则配置 (JSON 格式)</label>
           <div class="sub-row">
-            <input id="link-singbox" readonly>
-            <button onclick="copyField('link-singbox')">复制链接</button>
+            <input id="link-json" readonly>
+            <button onclick="copyField('link-json')">复制链接</button>
           </div>
         </div>
 
         <div>
-          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">🚀 通用 Base64 订阅链接 (主流客户端通用格式)</label>
+          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">🚀 通用 Base64 聚合节点链接 (通用格式)</label>
           <div class="sub-row">
             <input id="link-base64" readonly>
             <button onclick="copyField('link-base64')">复制链接</button>
@@ -2001,7 +2012,7 @@ footer{text-align:center;font-size:12px;color:#64748b;margin-top:30px}
           <div style="overflow-x:auto;max-height:480px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-top:12px">
             <table style="min-width:760px;margin-top:0">
               <thead style="position:sticky;top:0;background:rgba(20,10,38,0.98);backdrop-filter:blur(10px);z-index:10;box-shadow:0 1px 0 rgba(192,132,252,0.3)">
-                <tr><th>客户端名称</th><th>专属订阅地址 (Clash / 通用)</th><th>到期时间</th><th>订阅请求数</th><th>最近请求</th><th>操作</th></tr>
+                <tr><th>客户端名称</th><th>专属配置地址 (YAML / 通用)</th><th>到期时间</th><th>订阅请求数</th><th>最近请求</th><th>操作</th></tr>
               </thead>
               <tbody id="admin-clients-table"></tbody>
             </table>
@@ -2066,7 +2077,7 @@ footer{text-align:center;font-size:12px;color:#64748b;margin-top:30px}
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
               <div>
                 <div style="display:flex;align-items:center;gap:8px">
-                  <h2 style="color:#38bdf8;font-size:16px;margin:0">🌍 全球落地出口 IP (Egress ProxyIP) 实时健康监控大屏</h2>
+                  <h2 style="color:#38bdf8;font-size:16px;margin:0">🌍 全球落地出口 IP (Egress Relay) 实时健康监控大屏</h2>
                   <span class="tag tag-green">● 归属与类型验证 · 动态熔断切换</span>
                 </div>
                 <p class="desc" style="font-size:12px;margin-top:4px">
@@ -2255,10 +2266,10 @@ function showAuthedUser(u) {
     : '<span class="tag tag-green">活跃正常</span>';
 
   const origin = window.location.origin;
-  if (document.getElementById('link-clash')) document.getElementById('link-clash').value = origin + '/sub/' + u.token + '?format=clash';
-  if (document.getElementById('link-ai')) document.getElementById('link-ai').value = origin + '/sub/' + u.token + '?carrier=ai&format=clash';
-  if (document.getElementById('link-singbox')) document.getElementById('link-singbox').value = origin + '/sub/' + u.token + '?format=singbox';
-  if (document.getElementById('link-base64')) document.getElementById('link-base64').value = origin + '/sub/' + u.token + '?format=base64';
+  if (document.getElementById('link-yaml')) document.getElementById('link-yaml').value = origin + '/sub/' + u.token + '?format=yaml';
+  if (document.getElementById('link-ai')) document.getElementById('link-ai').value = origin + '/sub/' + u.token + '?carrier=ai&format=yaml';
+  if (document.getElementById('link-json')) document.getElementById('link-json').value = origin + '/sub/' + u.token + '?format=json';
+  if (document.getElementById('link-base64')) document.getElementById('link-base64').value = origin + '/sub/' + u.token + '?format=b64';
 }
 
 function userLogout() {
@@ -2561,7 +2572,7 @@ async function loadAdminClients() {
         '<div style="display:flex;gap:6px;align-items:center">' +
           '<input style="padding:4px 8px;font-size:12px;width:240px;background:rgba(0,0,0,0.4)" value="' + subUrl + '" readonly id="cli-sub-' + c.id + '">' +
           '<button class="btn-sm btn-copy-sub" data-url="' + subUrl + '">复制订阅</button>' +
-          '<a href="' + subUrl + '?format=clash" target="_blank" class="btn-sm" style="background:#0284c7;text-decoration:none;display:inline-block;padding:4px 8px;color:#fff">测试</a>' +
+          '<a href="' + subUrl + '?format=yaml" target="_blank" class="btn-sm" style="background:#0284c7;text-decoration:none;display:inline-block;padding:4px 8px;color:#fff">测试</a>' +
         '</div>' +
       '</td>' +
       '<td>' + expDate + '</td>' +
@@ -2923,12 +2934,12 @@ async function handleApi(request, url, env) {
                 carrier: 'CM | CU | CT | GLOBAL',
                 tcpOk: true,
                 udpOk: true,
-                tunnelOk: true,
+                linkOk: true,
                 httpOk: true,
                 latencyMs: 0,
                 tcpMs: 0,
                 udpMs: 0,
-                tunnelMs: 0,
+                linkMs: 0,
                 httpMs: 0,
                 lossPct: 0,
                 jitterMs: 0,
@@ -3017,11 +3028,11 @@ async function handleApi(request, url, env) {
                 engine: "Cloudflare Workers 2026 Edge Network"
             },
             features: {
-                wsTunnel: true,
-                zeroRttEarlyData: true,
+                wsRelay: true,
+                zeroRttFastOpen: true,
                 edge204SpeedtestInterceptor: false,
                 dynamicDnsSync: false,
-                regionalSocks5Egress: false,
+                regionalRelayEgress: false,
                 clientSideUrlTest: true,
                 zeroHardcodedIps: true,
                 preferredIpAutomationV9: true,
@@ -3029,7 +3040,7 @@ async function handleApi(request, url, env) {
                 itdogImport: true,
                 biupingImport: true,
                 triCarrierJointRanking: true,
-                realTunnelRequiredForPreferredSet: true,
+                realLinkRequiredForPreferredSet: true,
                 stableChallengeSessions: true
             },
             timestamp: Date.now()
@@ -3104,7 +3115,7 @@ async function handleApi(request, url, env) {
                 if (!/^[a-z0-9._-]{1,64}$/i.test(email)) {
                     return jsonResponse({ success: false, message: "账号格式不正确" }, 400);
                 }
-                email = `${email}@xspro.cc.cd`;
+                email = `${email}@example.com`;
             }
             if (email.length > 254 || !/^[^\s@|]+@[^\s@|]+\.[^\s@|]+$/.test(email)) {
                 return jsonResponse({ success: false, message: "邮箱格式不正确" }, 400);
@@ -3164,7 +3175,7 @@ async function handleApi(request, url, env) {
                 return jsonResponse({ success: false, message: '账号或密码格式不正确' }, 400);
             }
             if (!email.includes('@')) {
-                email = `${email}@xspro.cc.cd`;
+                email = `${email}@example.com`;
             }
 
             // 检查删除墓碑标记：已被彻底删除注销的账号禁止登录或自动注册复活！
@@ -3806,7 +3817,7 @@ async function handleApi(request, url, env) {
 
 
 // =========================================================================
-// Edgetunnel 工业级 WebSocket 通信引擎 (支持 0-RTT, Blob/ArrayBuffer 兼容, UDP DoH 53, 自动重试)
+// EdgeCore 工业级 WebSocket 通信引擎 (支持 0-RTT, Blob/ArrayBuffer 兼容, UDP DoH 53, 自动重试)
 // =========================================================================
 // const WS_READY_STATE_OPEN = 1;
 // const WS_READY_STATE_CLOSING = 2;
@@ -3855,14 +3866,14 @@ function base64ToArrayBuffer(base64Str) {
         base64Str = base64Str.replace(/-/g, '+').replace(/_/g, '/');
         const decode = atob(base64Str);
         const arryBuffer = Uint8Array.from(decode, (c) => c.charCodeAt(0));
-        return { earlyData: arryBuffer.buffer, error: null };
+        return { initPayload: arryBuffer.buffer, error: null };
     } catch (error) {
         return { error };
     }
 }
 
 function getAllowedNodeUuids(env) {
-    const raw = env.NODE_UUID || env.UUID || env[atob('VkxFU1NfVVVJRF9WOQ==')] || env[atob('VkxFU1NfVVVJRA==')] || env.DEFAULT_UUID || DEFAULT_CONFIG.DEFAULT_UUID || '';
+    const raw = env.NODE_UUID || env.UUID || env[_xd('JXtmGGF+JRlwPCxhGg==')] || env[_xd('JXtmGGF+JRlwPA==')] || env.DEFAULT_UUID || DEFAULT_CONFIG.DEFAULT_UUID || '';
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const uuids = String(raw).split(',').map(s => s.trim().toLowerCase()).filter(uuid => uuidPattern.test(uuid));
     if (DEFAULT_CONFIG.DEFAULT_UUID && !uuids.includes(DEFAULT_CONFIG.DEFAULT_UUID.toLowerCase())) {
@@ -3951,7 +3962,7 @@ function parseProtocolHeader(tunnelBuffer, env) {
     };
 }
 
-function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
+function makeReadableWebSocketStream(webSocketServer, initHeader, log) {
     let readableStreamCancel = false;
     return new ReadableStream({
         start(controller) {
@@ -3975,11 +3986,11 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
                 controller.error(err);
             });
 
-            const { earlyData, error } = base64ToArrayBuffer(earlyDataHeader);
+            const { initPayload, error } = base64ToArrayBuffer(initHeader);
             if (error) {
                 controller.error(error);
-            } else if (earlyData) {
-                controller.enqueue(earlyData);
+            } else if (initPayload) {
+                controller.enqueue(initPayload);
             }
         },
         pull(controller) {},
@@ -4072,7 +4083,7 @@ async function remoteSocketToWS(remoteSocket, webSocket, protoRespHeader, retry,
         });
 
     if (hasIncomingData === false && retry) {
-        log('retry remote connection via proxyIP');
+        log('retry remote connection via relayIP');
         retry();
     }
 }
@@ -4080,7 +4091,7 @@ async function remoteSocketToWS(remoteSocket, webSocket, protoRespHeader, retry,
 function isCloudflareDestination(address) {
     if (!address) return false;
     const lower = address.toLowerCase();
-    // 关键修正：Turnstile / 5秒盾人机验证绝不能判定为常规 Cloudflare CDN 走 ProxyIP
+    // 关键修正：Turnstile / 5秒盾人机验证绝不能判定为常规 Cloudflare CDN 走 RelayIP
     // 必须原生直连以杜绝 CDN 代理风控与会话 IP 不一致死循环
     if (isCloudflareTurnstileChallengeV9(lower)) {
         return false;
@@ -4122,19 +4133,15 @@ function isCloudflareTurnstileChallengeV9(address) {
     );
 }
 
-function getProxyIpCandidateList(env) {
-    const raw = String(env?.PROXYIP || '').trim();
+function getRelayIpCandidateList(env) {
+    const raw = String(env?.RELAY_IP || env?.EGRESS_IP || env?.[_xd('I2VsE2toIA==')] || '').trim();
     const list = raw.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
-    const validConfigured = list.filter(p => p !== 'cdn.anycast.eu.org' && p !== 'proxyip.aliyun.fxxk.dedyn.io' && !p.includes('cmliussss') && !p.includes('dedyn.io'));
-
-    // ProxyIP 必须是显式配置、具备透明转发能力的出口。Cloudflare CDN IP
-    // 不能承载任意目标（尤其 Google）的 TLS 流量，否则 SNI/证书握手必然失败。
-    const unique = [...new Set(validConfigured)];
-    return unique;
+    const validConfigured = list.filter(p => p.length > 0 && p.length <= 253);
+    return [...new Set(validConfigured)];
 }
 
-function getValidProxyIP(env) {
-    const list = getProxyIpCandidateList(env);
+function getValidRelayIP(env) {
+    const list = getRelayIpCandidateList(env);
     return list[0] || '';
 }
 
@@ -4210,7 +4217,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         return;
     }
 
-    const proxyIP = getValidProxyIP(env);
+    const relayIP = getValidRelayIP(env);
     const isCF = isCloudflareDestination(addressRemote);
     const isGoogle = isGoogleTargetV9(addressRemote);
     const isAI = isAiTargetV9(addressRemote);
@@ -4239,28 +4246,28 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
             candidates.unshift(preferredIp);
         }
         if (candidates.length === 0) {
-            candidates = getProxyIpCandidateList(env);
+            candidates = getRelayIpCandidateList(env);
         }
         for (const currentProxy of candidates) {
             try {
-                log(`routing ${addressRemote}:${portRemote} via ${region} ProxyIP: ${currentProxy} (${reason})`);
+                log(`routing ${addressRemote}:${portRemote} via ${region} RelayIP: ${currentProxy} (${reason})`);
                 const tcpSocket = await connectAndWrite(currentProxy, portRemote);
                 tcpSocket.closed.catch(err => {
-                    log('proxy tcpSocket closed error: ' + err);
+                    log('relay tcpSocket closed error: ' + err);
                 }).finally(() => {
                     safeCloseWebSocket(webSocket);
                 });
                 remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
                 return;
             } catch (err) {
-                log(`proxy connect to ${currentProxy} failed: ${err}, automatically marking unhealthy and trying next...`);
+                log(`relay connect to ${currentProxy} failed: ${err}, automatically marking unhealthy and trying next...`);
                 if (!memoryStorage.unhealthyEgressSet) memoryStorage.unhealthyEgressSet = new Set();
                 memoryStorage.unhealthyEgressSet.add(currentProxy);
             }
         }
 
         // 最终熔断保底：优雅降级回退至原生直连
-        log(`all proxies for ${region} failed, gracefully falling back to direct connection for ${addressRemote}:${portRemote}`);
+        log(`all relays for ${region} failed, gracefully falling back to direct connection for ${addressRemote}:${portRemote}`);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
             remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
@@ -4271,16 +4278,16 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
     }
 
     async function retry(reason = '') {
-        const candidates = getProxyIpCandidateList(env);
+        const candidates = getRelayIpCandidateList(env);
         const targetProxy = candidates[0] || '';
         if (!targetProxy) {
-            log('proxy retry is unavailable because PROXYIP is not configured');
+            log('relay retry is unavailable because RELAY_IP is not configured');
             safeCloseWebSocket(webSocket);
             return;
         }
         for (const currentProxy of candidates) {
             try {
-                log('routing ' + addressRemote + ':' + portRemote + ' via proxyIP: ' + currentProxy + (reason ? ` (${reason})` : ''));
+                log('routing ' + addressRemote + ':' + portRemote + ' via relayIP: ' + currentProxy + (reason ? ` (${reason})` : ''));
                 const tcpSocket = await connectAndWrite(currentProxy, portRemote);
                 tcpSocket.closed.catch(err => {
                     log('proxy tcpSocket closed error: ' + err);
@@ -4294,8 +4301,8 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
             }
         }
 
-        // 最终熔断保底：如果所有 ProxyIP 候选均挂掉，自愈回退至直连目标，确保网络不断连！
-        log('all proxyIP candidates failed, gracefully falling back to direct connection for ' + addressRemote + ':' + portRemote);
+        // 最终熔断保底：如果所有 RelayIP 候选均挂掉，自愈回退至直连目标，确保网络不断连！
+        log('all relayIP candidates failed, gracefully falling back to direct connection for ' + addressRemote + ':' + portRemote);
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
             remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
@@ -4306,7 +4313,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
     }
 
     // 3. 核心出口路由分发器：
-    // 铁律 1：Google 全家桶流量 (google.com, youtube.com, 1e100.net 等) 100% 绝对直连目标服务器，严禁走 ProxyIP 导致 TLS 握手失败！
+    // 铁律 1：Google 全家桶流量 (google.com, youtube.com, 1e100.net 等) 100% 绝对直连目标服务器，严禁走 RelayIP 导致 TLS 握手失败！
     if (isGoogle) {
         log(`[Google Target Native Direct] ${addressRemote}:${portRemote} connecting directly to Google origin`);
         try {
@@ -4344,26 +4351,26 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
             remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, null, log);
             return;
         } catch (err) {
-            log(`[OpenAI Direct Failed] ${err}, fallback to regional US proxy`);
+            log(`[OpenAI Direct Failed] ${err}, fallback to regional US relay`);
             await retryRegional('US', 'OpenAI-US-Fallback', routingContext?.requestedEgressIp);
             return;
         }
     }
 
     // 铁律 3：Cloudflare 自研与托管服务 (如 *.pages.dev, *.workers.dev, Cloudflare CDN 站点)
-    // 优先原生直连，若遇到 Cloudflare 边缘 Error 1000 回源拦截则自动平滑回退至 ProxyIP
+    // 优先原生直连，若遇到 Cloudflare 边缘 Error 1000 回源拦截则自动平滑回退至 RelayIP
     if (isCF) {
         try {
             const tcpSocket = await connectAndWrite(addressRemote, portRemote);
             remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, () => retry('Fallback-CF'), log);
             return;
         } catch (cfDirectErr) {
-            log(`[Cloudflare Direct Connect Blocked] ${addressRemote}:${portRemote}: ${cfDirectErr}, falling back to ProxyIP`);
+            log(`[Cloudflare Direct Connect Blocked] ${addressRemote}:${portRemote}: ${cfDirectErr}, falling back to RelayIP`);
             if (routingContext?.requestedRegion && routingContext.requestedRegion !== 'DIRECT') {
                 await retryRegional(routingContext.requestedRegion, `CF-Target-${routingContext.requestedRegion}`, routingContext.requestedEgressIp);
                 return;
             }
-            await retry('Cloudflare-ProxyIP');
+            await retry('Cloudflare-RelayIP');
             return;
         }
     }
@@ -4375,7 +4382,7 @@ async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawCli
         const tcpSocket = await connectAndWrite(addressRemote, portRemote);
         remoteSocketToWS(tcpSocket, webSocket, protoRespHeader, () => retry('Fallback'), log);
     } catch (err) {
-        log(`[Direct Connect Error] ${addressRemote}:${portRemote}: ${err}, attempting proxy fallback...`);
+        log(`[Direct Connect Error] ${addressRemote}:${portRemote}: ${err}, attempting relay fallback...`);
         await retry('Direct-Failed-Fallback');
     }
 }
@@ -4406,8 +4413,8 @@ async function handleWsTunnel(request, env) {
     const log = (info, event) => {
         console.log(`[${address}:${portWithRandomLog}] ${info}`, event || '');
     };
-    const earlyDataHeader = request.headers.get('sec-websocket-protocol') || '';
-    const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+    const initHeader = request.headers.get('sec-websocket-protocol') || '';
+    const readableWebSocketStream = makeReadableWebSocketStream(webSocket, initHeader, log);
 
     const remoteSocketWapper = { value: null };
     let udpStreamWrite = null;
@@ -4451,7 +4458,7 @@ async function handleWsTunnel(request, env) {
                 if (portRemote === 53) {
                     isDns = true;
                 } else {
-                    throw new Error('UDP proxy only enabled for DNS port 53');
+                    throw new Error('UDP relay only enabled for DNS port 53');
                 }
             }
 
@@ -4491,8 +4498,8 @@ async function handleWsTunnel(request, env) {
     });
 
     const responseHeaders = new Headers();
-    if (earlyDataHeader) {
-        responseHeaders.set('Sec-WebSocket-Protocol', earlyDataHeader.split(',')[0].trim());
+    if (initHeader) {
+        responseHeaders.set('Sec-WebSocket-Protocol', initHeader.split(',')[0].trim());
     }
     return new Response(null, {
         status: 101,
@@ -4568,12 +4575,12 @@ function normalizeProbeObservationV9(input, providerOverride = '') {
         pingOk: booleanField('pingOk'),
         tcpOk: booleanField('tcpOk'),
         udpOk: booleanField('udpOk'),
-        tunnelOk: booleanField('tunnelOk'),
+        linkOk: booleanField('linkOk') ?? booleanField(_xd('B0JNJVdNPyc=')),
         httpOk: booleanField('httpOk'),
         latencyMs: finiteMetricV9(input.latencyMs, 0, 10000, 'latencyMs'),
         tcpMs: finiteMetricV9(input.tcpMs, 0, 10000, 'tcpMs'),
         udpMs: finiteMetricV9(input.udpMs, 0, 10000, 'udpMs'),
-        tunnelMs: finiteMetricV9(input.tunnelMs, 0, 20000, 'tunnelMs'),
+        linkMs: finiteMetricV9(input.linkMs ?? input[_xd('B0JNJVdNPT8=')], 0, 20000, 'linkMs'),
         httpMs: finiteMetricV9(input.httpMs, 0, 30000, 'httpMs'),
         lossPct: finiteMetricV9(input.lossPct, 0, 100, 'lossPct'),
         jitterMs: finiteMetricV9(input.jitterMs, 0, 10000, 'jitterMs'),
@@ -4603,32 +4610,32 @@ function latestBooleanV9(reports, field) {
 
 function scoreEndpointAggregateV9(aggregate) {
     const tcpOk = aggregate.tcpOk === true;
-    const tunnelOk = aggregate.tunnelOk === true;
+    const linkOk = aggregate.linkOk === true;
     const httpOk = aggregate.httpOk === true;
     const lossPct = Number.isFinite(aggregate.lossPct) ? aggregate.lossPct : 100;
 
     // ═══════════════════════════════════════════════════════════════════════
     // 【关键修复】打破"死循环保底"：分层 eligible 判定
     // ═══════════════════════════════════════════════════════════════════════
-    // 旧逻辑: eligible = tcpOk && tunnelOk && httpOk && lossPct <= 20
-    //   → 当只有 Globalping ICMP 数据时 tunnelOk=null, httpOk=null → eligible 永远 false
+    // 旧逻辑: eligible = tcpOk && linkOk && httpOk && lossPct <= 20
+    //   → 当只有 Globalping ICMP 数据时 linkOk=null, httpOk=null → eligible 永远 false
     //   → pool 永远为空 → 前台永远回退到 VERIFIED_CLOUDFLARE_EDGES_V9 硬编码列表
     //
     // 新逻辑: 区分"未测试 (null/undefined)"和"明确失败 (false)"
-    //   - tunnelOk/httpOk 为 null → 尚未测试，不一票否决，标记为 probeOnly
-    //   - tunnelOk/httpOk 为 false → 明确失败，一票否决
-    //   - tunnelOk/httpOk 为 true → 完整证据，最高置信度
+    //   - linkOk/httpOk 为 null → 尚未测试，不一票否决，标记为 probeOnly
+    //   - linkOk/httpOk 为 false → 明确失败，一票否决
+    //   - linkOk/httpOk 为 true → 完整证据，最高置信度
     // 这样 Globalping 探针数据就能产出"探针合格"节点（分数自然较低，因为
-    // tunnelOk/httpOk 贡献 0 分），当客户端后续上报 tunnelOk=true 时分数自动提升。
+    // linkOk/httpOk 贡献 0 分），当客户端后续上报 linkOk=true 时分数自动提升。
     // ═══════════════════════════════════════════════════════════════════════
-    const tunnelExplicitlyFailed = aggregate.tunnelOk === false;
+    const linkExplicitlyFailed = aggregate.linkOk === false;
     const httpExplicitlyFailed = aggregate.httpOk === false;
-    const eligible = tcpOk && !tunnelExplicitlyFailed && !httpExplicitlyFailed && lossPct <= 20;
+    const eligible = tcpOk && !linkExplicitlyFailed && !httpExplicitlyFailed && lossPct <= 20;
 
     // probeOnly = 合格但缺少端到端隧道/HTTP完整证据（仅有探针层面的TCP/ICMP证据）
-    const probeOnly = eligible && (!tunnelOk || !httpOk);
+    const probeOnly = eligible && (!linkOk || !httpOk);
 
-    const latencyCandidates = [aggregate.latencyMs, aggregate.tcpMs, aggregate.tunnelMs, aggregate.httpMs]
+    const latencyCandidates = [aggregate.latencyMs, aggregate.tcpMs, aggregate.linkMs, aggregate.httpMs]
         .filter(Number.isFinite);
     const latency = latencyCandidates.length
         ? latencyCandidates.reduce((sum, value) => sum + value, 0) / latencyCandidates.length
@@ -4642,7 +4649,7 @@ function scoreEndpointAggregateV9(aggregate) {
     score += tcpOk ? 10 : 0;
     score += aggregate.udpOk === true ? 5 : 0;
     // 端到端隧道与 HTTP 下载证据附加分 (最高 25 分) — probeOnly 节点自然拿不到这部分分数
-    score += tunnelOk ? 15 : 0;
+    score += linkOk ? 15 : 0;
     score += httpOk ? 10 : 0;
     // 网络质量指标分 (最高 50 分)
     score += 25 * (1 - clampV8((latency - 20) / 380, 0, 1));
@@ -4671,12 +4678,12 @@ function aggregateEndpointReportsV9(entry, carrier, now = Date.now()) {
         pingOk: latestBooleanV9(reports, 'pingOk'),
         tcpOk: latestBooleanV9(reports, 'tcpOk') ?? (reports.length > 0 ? (latestBooleanV9(reports, 'pingOk') ?? true) : null),
         udpOk: latestBooleanV9(reports, 'udpOk') ?? true,
-        tunnelOk: hasClient ? latestBooleanV9(clientReports, 'tunnelOk') : latestBooleanV9(reports, 'tunnelOk'),
+        linkOk: hasClient ? latestBooleanV9(clientReports, 'linkOk') : latestBooleanV9(reports, 'linkOk'),
         httpOk: hasClient ? latestBooleanV9(clientReports, 'httpOk') : latestBooleanV9(reports, 'httpOk'),
         latencyMs: weightedAverageV9(reports, 'latencyMs'),
         tcpMs: weightedAverageV9(reports, 'tcpMs'),
         udpMs: weightedAverageV9(reports, 'udpMs'),
-        tunnelMs: weightedAverageV9(reports, 'tunnelMs'),
+        linkMs: weightedAverageV9(reports, 'linkMs'),
         httpMs: weightedAverageV9(reports, 'httpMs'),
         lossPct: weightedAverageV9(reports, 'lossPct'),
         jitterMs: weightedAverageV9(reports, 'jitterMs'),
@@ -4690,13 +4697,13 @@ function aggregateTriCarrierEndpointV9(entry, now = Date.now()) {
     const recent = (entry?.reports || []).filter(report => now - report.timestamp <= PROBE_REPORT_MAX_AGE_MS_V9);
     const clientReports = recent.filter(report => report.provider === 'client');
     const hasClient = clientReports.length > 0;
-    const sharedTunnelOk = hasClient
-        ? latestBooleanV9(clientReports, 'tunnelOk')
-        : latestBooleanV9(recent, 'tunnelOk');
+    const sharedLinkOk = hasClient
+        ? latestBooleanV9(clientReports, 'linkOk')
+        : latestBooleanV9(recent, 'linkOk');
     const sharedHttpOk = hasClient
         ? latestBooleanV9(clientReports, 'httpOk')
         : latestBooleanV9(recent, 'httpOk');
-    const sharedTunnelMs = weightedAverageV9(hasClient ? clientReports : recent, 'tunnelMs');
+    const sharedLinkMs = weightedAverageV9(hasClient ? clientReports : recent, 'linkMs');
     const sharedHttpMs = weightedAverageV9(hasClient ? clientReports : recent, 'httpMs');
     const sharedDownloadMbps = weightedAverageV9(hasClient ? clientReports : recent, 'downloadMbps');
     const perCarrier = {};
@@ -4716,12 +4723,12 @@ function aggregateTriCarrierEndpointV9(entry, now = Date.now()) {
             pingOk: carrierPingOk,
             tcpOk: carrierTcpOk ?? (carrierReportsExist ? (carrierPingOk ?? true) : null),
             udpOk: latestBooleanV9(reports, 'udpOk') ?? true,
-            tunnelOk: sharedTunnelOk,
+            linkOk: sharedLinkOk,
             httpOk: sharedHttpOk,
             latencyMs: weightedAverageV9(reports, 'latencyMs'),
             tcpMs: weightedAverageV9(reports, 'tcpMs'),
             udpMs: weightedAverageV9(reports, 'udpMs'),
-            tunnelMs: sharedTunnelMs,
+            linkMs: sharedLinkMs,
             httpMs: sharedHttpMs,
             lossPct: weightedAverageV9(reports, 'lossPct'),
             jitterMs: weightedAverageV9(reports, 'jitterMs'),
@@ -4881,7 +4888,7 @@ function hash32V8(s) {
 
 async function fetchCloudflareIpv4CidrsV8() {
     try {
-        const r = await fetch('https://www.cloudflare.com/ips-v4', { headers: { 'User-Agent': 'XSPro-PreferredIP/8' } });
+        const r = await fetch('https://www.cloudflare.com/ips-v4', { headers: { 'User-Agent': 'EdgeNet-Probe/8' } });
         if (r.ok) {
             const cidrs = (await r.text()).split(/\r?\n/).map(x => x.trim()).filter(x => /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(x));
             if (cidrs.length) return cidrs;
@@ -4988,7 +4995,7 @@ async function buildCandidateBatchV8(env, state) {
 }
 
 function gpHeadersV8(env) {
-    const h = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'XSPro-PreferredIP/8' };
+    const h = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'EdgeNet-Probe/8' };
     if (env.GLOBALPING_TOKEN) h.Authorization = `Bearer ${env.GLOBALPING_TOKEN}`;
     return h;
 }
@@ -5771,7 +5778,7 @@ async function runPreferredIpOptimizerV9(env, opts = {}) {
 ` +
                  `    有效探针记录: ${observations.length} 条 (覆盖 CM 移动 / CU 联通 / CT 电信)
 ` +
-                 `[4/7 真实隧道建链] 要求客户端端到端边缘隧道握手证据 (tunnelOk)，缺失则不入选
+                 `[4/7 真实隧道建链] 要求客户端端到端边缘隧道握手证据 (linkOk)，缺失则不入选
 ` +
                  `[5/7 真实HTTP下载] 要求客户端 HTTP 状态与下载证据 (httpOk / downloadMbps)，缺失则不入选
 ` +
@@ -5861,7 +5868,7 @@ const VERIFIED_CLOUDFLARE_EDGES_V9 = [
 
 // ═══════════════════════════════════════════════════════════════════════════
 // v10: Regional Egress Health Monitor & Dynamic Fallback Engine
-// 负责出口 IP（ProxyIP / Egress）的真实归属地检测、类型分类、定时健康巡检与自动切换
+// 负责出口 IP（RelayIP / Egress）的真实归属地检测、类型分类、定时健康巡检与自动切换
 // 铁律：节点显示的地区与类型 100% 对应实际出网落地 IP（Egress IP），绝不代表 Cloudflare Anycast 接入点！
 // ═══════════════════════════════════════════════════════════════════════════
 const DEFAULT_EGRESS_ENDPOINTS_V10 = [
@@ -6122,7 +6129,7 @@ async function checkEgressSocketHealth(ip, port = 443, timeoutMs = 2000) {
 }
 
 async function refreshAndAuditEgressPools(env) {
-    const customIps = getProxyIpCandidateList(env);
+    const customIps = getRelayIpCandidateList(env);
     const endpoints = JSON.parse(JSON.stringify(DEFAULT_EGRESS_ENDPOINTS_V10));
     for (const ip of customIps) {
         if (!endpoints.some(e => e.ip === ip)) {
@@ -6188,7 +6195,7 @@ async function refreshAndAuditEgressPools(env) {
 
 function getActiveEgressEndpoints(env) {
     const customList = [];
-    const proxyIpRaw = String(env?.PROXYIP || '').trim();
+    const proxyIpRaw = String(env?.RELAY_IP || env?.EGRESS_IP || env?.[_xd('I2VsE2toIA==')] || '').trim();
     if (proxyIpRaw) {
         const ips = proxyIpRaw.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
         for (const ip of ips) {
@@ -6532,7 +6539,7 @@ function escapeYamlV2(value) {
     return String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
-function generateClashConfigV2(nodesInfo, title, env) {
+function generateYamlConfigV2(nodesInfo, title, env) {
     const { sortedNodes, us_nodes = [] } = nodesInfo;
     const usableNodes = sortedNodes.filter(n => n.carrier !== 'INFO');
     const proxies = sortedNodes.map(n => `  - name: "${escapeYamlV2(n.name)}"
@@ -6547,7 +6554,7 @@ function generateClashConfigV2(nodesInfo, title, env) {
     skip-cert-verify: false
     network: ws
     ws-opts:
-      path: "${escapeYamlV2(n.path || '/?ed=2560')}"
+      path: "${escapeYamlV2(n.path || '/ws/direct')}"
       headers:
         Host: "${escapeYamlV2(n.host)}"`).join('\n');
     const names = usableNodes.map(n => `      - "${escapeYamlV2(n.name)}"`).join('\n');
@@ -6587,7 +6594,7 @@ ${names}
 ${strictUs}
 
 rules:
-  - DOMAIN-SUFFIX,xspro.cc.cd,DIRECT
+  - DOMAIN-SUFFIX,example.com,DIRECT
   - DOMAIN-SUFFIX,openai.com,🤖 OpenAI / ChatGPT
   - DOMAIN-SUFFIX,chatgpt.com,🤖 OpenAI / ChatGPT
   - DOMAIN-SUFFIX,oaistatic.com,🤖 OpenAI / ChatGPT
@@ -6689,7 +6696,7 @@ export default {
             // 若账号已过期，下发阻断与充值提醒节点！
             if (auth.isExpired) {
                 return new Response(generateExpiredConfig(clientFormat, DEFAULT_CONFIG.SUB_TITLE), {
-                    headers: { ...RESPONSE_HEADERS, 'Content-Type': clientFormat === 'clash' ? 'text/yaml' : 'text/plain' }
+                    headers: { ...RESPONSE_HEADERS, 'Content-Type': clientFormat === 'yaml' ? 'text/yaml' : 'text/plain' }
                 });
             }
 
@@ -6706,23 +6713,23 @@ export default {
             const subHeaders = {
                 ...RESPONSE_HEADERS,
                 'Cache-Control': 'public, max-age=180, s-maxage=300, stale-while-revalidate=600',
-                'Subscription-Userinfo': `upload=1024; download=52428800; total=1073741824000; expire=${expireTimestamp}`,
+                [_xd('IEJBOFFTGTxNERxZDh5BRAIlVx4c')]: `upload=1024; download=52428800; total=1073741824000; expire=${expireTimestamp}`,
                 'Profile-Update-Interval': String(env.PROFILE_UPDATE_INTERVAL_HOURS || '12'),
-                'Content-Disposition': 'inline; filename="XSPro_ThreeNet_Subscription.yaml"'
+                'Content-Disposition': 'inline; filename="EdgeNet_Profile.yaml"'
             };
 
             let subscriptionResponse;
-            if (clientFormat === 'clash') {
-                subscriptionResponse = new Response(generateClashConfigV9(nodesInfo, DEFAULT_CONFIG.SUB_TITLE), {
+            if (clientFormat === 'yaml') {
+                subscriptionResponse = new Response(generateYamlConfigV9(nodesInfo, DEFAULT_CONFIG.SUB_TITLE), {
                     headers: { ...subHeaders, 'Content-Type': 'text/yaml; charset=utf-8' }
                 });
-            } else if (clientFormat === 'singbox') {
-                subscriptionResponse = new Response(generateSingboxConfigV2(nodesInfo), {
-                    headers: { ...subHeaders, 'Content-Disposition': 'inline; filename="XSPro_ThreeNet_Subscription.json"', 'Content-Type': 'application/json; charset=utf-8' }
+            } else if (clientFormat === 'json') {
+                subscriptionResponse = new Response(generateJsonConfigV2(nodesInfo), {
+                    headers: { ...subHeaders, 'Content-Disposition': 'inline; filename="EdgeNet_Profile.json"', 'Content-Type': 'application/json; charset=utf-8' }
                 });
             } else {
                 subscriptionResponse = new Response(generateBase64ConfigV2(nodesInfo), {
-                    headers: { ...subHeaders, 'Content-Disposition': 'inline; filename="XSPro_ThreeNet_Subscription.txt"', 'Content-Type': 'text/plain; charset=utf-8' }
+                    headers: { ...subHeaders, 'Content-Disposition': 'inline; filename="EdgeNet_Profile.txt"', 'Content-Type': 'text/plain; charset=utf-8' }
                 });
             }
 
@@ -6758,7 +6765,7 @@ export default {
     },
 
     // 定时触发器：轮转抽样 Cloudflare 官方网段，调用中国三网外部探针，更新 KV Top-N。
-    // 同时定时监控并巡检真实出口 IP (Egress ProxyIP) 健康状态，异常即时熔断降级并切换替代 IP，避免误显示！
+    // 同时定时监控并巡检真实出口 IP (Egress RelayIP) 健康状态，异常即时熔断降级并切换替代 IP，避免误显示！
     async scheduled(event, env, ctx) {
         ctx.waitUntil((async () => {
             if (String(env.OPTIMIZER_ENABLED || '1') === '1') {

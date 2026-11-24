@@ -9,6 +9,7 @@
     "deploy": "node build.js && npx wrangler deploy"
   },
   "devDependencies": {
+    "acorn": "^8.15.0",
     "terser": "^5.39.0",
     "wrangler": "^4.0.0"
   },
@@ -26,14 +27,14 @@
       "SUB_TITLE": {
         "description": "【节点名称前缀】客户端节点列表中展示的前缀名称（默认：Preferred-IP 三网实测节点）。"
       },
-      "PROXYIP": {
+      "RELAY_IP": {
         "description": "【备用出口 IP】遇到 Cloudflare 边缘回环限制时的备用中继出口 IP，绝大部分网站走原生直连，默认留空即可。"
       },
       "ADMIN_PASSWORD_V9": {
         "description": "【管理员密码】首次登录后台的管理员强密码（建议至少 12 位，登录后可在后台修改）。"
       },
       "TOKEN_SECRET_V9": {
-        "description": "【Token 签名密钥】用于 HMAC 校验客户端订阅 Token 防篡改（推荐 24 位以上的随机英文字符串）。"
+        "description": "【Token 签名密钥】用于 HMAC 校验客户端访问 Token 防篡改（推荐 24 位以上的随机英文字符串）。"
       },
       "NODE_UUID": {
         "description": "【节点通信识别码 UUID】客户端安全连接识别码（标准 UUID 格式，例如：12345678-1234-1234-1234-123456789abc）。"

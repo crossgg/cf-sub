@@ -99,10 +99,10 @@
 
 ## ❓ 常见问题 (FAQ)
 
-### Q1: `PROXYIP` 是做什么用的？必须填吗？
+### Q1: `RELAY_IP` 是做什么用的？必须填吗？
 * **回答：默认留空即可，不需要填。**
-* **原理**：Cloudflare 禁止 Worker 直接回环连接到 Cloudflare 自己的 CDN 节点（会报 `Error 1000`）。当 Worker 访问的目标也是托管在 Cloudflare 上的站点时，`PROXYIP` 作为外部中转跳板代为转发。
-* **实际影响**：日常访问 Google, YouTube, GitHub, Twitter 等绝大部分主流网站走的是 Worker 原生直连（速度最快、延迟最低）。只有在遇到极少数套了 Cloudflare CDN 且打不开的站点时，才需要在后台添加 `PROXYIP`。
+* **原理**：Cloudflare 禁止 Worker 直接回环连接到 Cloudflare 自己的 CDN 节点（会报 `Error 1000`）。当 Worker 访问的目标也是托管在 Cloudflare 上的站点时，`RELAY_IP`（兼容旧名 `PROXYIP`）作为外部中转跳板代为转发。
+* **实际影响**：日常访问 Google, YouTube, GitHub, Twitter 等绝大部分主流网站走的是 Worker 原生直连（速度最快、延迟最低）。只有在遇到极少数套了 Cloudflare CDN 且打不开的站点时，才需要在后台添加 `RELAY_IP`。
 
 ### Q2: 每天 100,000 次免费额度够用吗？
 * **回答：个人或小团体完全绰绰有余。**

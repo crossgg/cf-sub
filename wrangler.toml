@@ -24,7 +24,7 @@ ADMIN_EMAIL = "admin@example.com"
 SUB_TITLE = "Preferred-IP 三网实测节点"
 
 # 备用中继出口 IP：遇到 Cloudflare Error 1000 时的备用出口，绝大多数网站走原生直连，默认留空
-PROXYIP = ""
+RELAY_IP = ""
 
 # 边缘缓存时间（秒）：有效节省每日 Workers 请求额度
 CACHE_TTL = "300"
