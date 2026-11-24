@@ -16,7 +16,7 @@
 | :--- | :--- | :---: | :--- |
 | **[方式一：Cloudflare 官方一键部署按钮](#-方式一cloudflare-官方一键部署按钮)** | 点击按钮直达 CF 控制台，自动授权导入 | ⭐⭐⭐⭐ | 想通过官方网页流程部署 |
 | **[方式二：GitHub Actions 一键自动部署](#-方式二github-actions-一键自动部署全自动创建-kv-与-secrets推荐)** | **全自动创建 KV、自动生成 UUID/密钥**，最少仅需 1 个 Token | ⭐⭐⭐⭐⭐ | **强烈推荐**，最省心且永久自动维护 |
-| **[方式三：CF 控制台直接粘贴代码](#-方式三cf-控制台直接复制代码部署小白速通)** | 复制 `_worker.js` 代码直接粘贴发布 | ⭐⭐⭐ | 仅测试体验，不想配置 Git |
+| **[方式三：CF 控制台直接粘贴代码](#-方式三cf-控制台直接复制代码部署小白速通)** | 复制 `dist/_worker.js` 混淆代码直接粘贴发布 | ⭐⭐⭐ | 仅测试体验，不想配置 Git |
 
 ---
 
@@ -63,8 +63,54 @@
 
 1. 登录 [Cloudflare 控制台](https://dash.cloudflare.com/)，点击 **Workers & Pages** -> **Create** -> **Create Worker**；
 2. 输入任意名称（如 `cf-sub`），点击 **Deploy**；
-3. 点击 **Edit code**，清空默认代码，将本项目中的 [`_worker.js`](_worker.js) 全部内容复制并粘贴进去，点击 **Deploy** 保存；
-4. *(可选，推荐)*：在左侧 **Storage & Databases** -> **KV** 中创建名为 `XS_SUB_KV` 的命名空间，并在 Worker 的 **Settings** -> **Bindings** 中绑定为 `XS_SUB_KV`。
+3. 点击 **Edit code**，清空默认代码，将本项目混淆构建好的 [`dist/_worker.js`](dist/_worker.js) 全部内容复制并粘贴进去，点击 **Deploy** 保存；
+4. 按照下方 **[正常运行必需配置清单](#-正常运行必需配置清单部署后必看)** 补齐机密、自定义域名与 `XS_SUB_KV` 绑定。
+
+---
+
+## ⚙️ 正常运行必需配置清单（部署后必看）
+
+> 若通过 **GitHub Actions（方式二）** 部署，工作流会自动创建 KV 并注入全部机密；若使用 **官方一键部署（方式一）** 或 **手动部署（方式三）**，请按以下 4 步配齐，缺一不可：
+
+### 1. 三个核心机密（Secrets · 必填）
+路径：Cloudflare 控制台 -> 进入该 Worker -> **Settings -> Variables and Secrets -> Add（勾选 Encrypt）**
+
+| 变量名 | 严格要求 | 缺失 / 填错后果 |
+| :--- | :--- | :--- |
+| **`NODE_UUID`**<br>*(自动兼容历史 UUID 变量名)* | **必须为标准 RFC4122 v1~v5 UUID**<br>第 3 段首位须为 `1~5`，第 4 段首位须为 `8/9/a/b`<br>✅ 正确示例：`c83a71b2-5f6e-4b9a-8c1d-9e2f3a4b5c6d` | ⚠️ **切勿手编** `12345678-1234-1234-1234-123456789abc`（第 4 段不符合规范会被拒收），否则配置接口报 **`503`**、客户端握手全部失败。<br>生成方式：PowerShell 执行 `[guid]::NewGuid()` 或 Node 执行 `node -e "console.log(crypto.randomUUID())"`。 |
+| **`TOKEN_SECRET_V9`** | **长度必须 $\ge 24$ 位**的随机字符串 | 缺失或不足 24 位时，注册、管理员首次登录、签发客户端 Token 全部报 **`500`**。 |
+| **`ADMIN_PASSWORD_V9`** | 建议 $\ge 12$ 位强密码 | 缺失时无法解锁「管理端后台」，也无法初始化管理员账号。 |
+
+### 2. 自定义域名（两处必须同时配置）
+
+| 配置位置 | 填写内容 | 说明 |
+| :--- | :--- | :--- |
+| **① 环境变量 `DOMAIN`**<br>*(Settings -> Variables and Secrets)* | 你的子域名（如 `sub.example.com`） | 若 `DOMAIN` 留空，下发节点的 `Host` / `SNI` 会回退为占位符 `sub.example.com` 导致无法连通，**务必填写真实域名**。 |
+| **② 绑定自定义域路由**<br>*(Settings -> Domains & Routes -> Add Custom Domain)* | 同上（如 `sub.example.com`） | 主域名须托管在同一 Cloudflare 账号下，且 DNS 列表不能存在同名 A/CNAME 冲突记录。保存后等待 1~2 分钟自动签发 SSL 证书即可。*(仅用 `*.workers.dev` 在国内大多被阻断且不支持优选 IP 路由)* |
+
+### 3. KV 持久化存储绑定（强烈建议必填）
+1. 在 Cloudflare 控制台左侧 **Storage & Databases -> KV** 中创建一个命名空间（名称任意，如 `XS_SUB_KV`）；
+2. 进入该 Worker -> **Settings -> Bindings -> Add Binding -> KV Namespace**：
+   - **Variable name（变量名）**：必须严格填写 **`XS_SUB_KV`**
+   - **KV namespace**：选择刚创建的空间并保存。
+3. **说明**：为避免一键部署触发 `code: 10042` 构建报错，`wrangler.toml` 默认跳过 KV 绑定。不绑定虽可打开页面，但 Worker 休眠重启后**所有注册用户、客户端管理列表、CDK、优选测速缓存和配额统计都会清空**，且客户端探针上报会报错。
+
+### 4. 可选环境变量（均已有内置默认值）
+
+| 变量名 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| **`ADMIN_EMAIL`** | `admin@example.com` | 管理员登录邮箱（配合 `ADMIN_PASSWORD_V9` 首次登录用户中心完成初始化）。 |
+| **`SUB_TITLE`** | `Preferred-IP 三网实测节点` | 客户端导入时展示的节点名称前缀。 |
+| **`RELAY_IP`** *(兼容 `PROXYIP`)* | 留空 | 备用中继出口 IP。日常绝大部分网站走原生直连，**默认留空即可**；仅访问同样托管在 Cloudflare 的站点报 Error 1000 时按需填写。 |
+| **`GLOBALPING_TOKEN`** | 留空 | 可选，用于提高每 30 分钟定时优选探针的免费额度上限。 |
+
+*(注：构建依赖 `terser`/`acorn`/`wrangler`、`compatibility_flags = ["nodejs_compat"]` 以及每 30 分钟一次的 Cron 定时任务均已在仓库内置，无需额外修改。)*
+
+### ✅ 部署完成后的 4 步上线验收清单
+1. 浏览器访问 `https://<你的域名>/` → 正常加载仪表盘且无 1101 / 500 报错；
+2. 切换到 **「管理端后台」** Tab，输入 `ADMIN_PASSWORD_V9` → 成功解锁后台；
+3. 在 **「客户端管理」** 签发一个测试客户端，点击右侧 **「测试」** → 浏览器返回 YAML 节点列表，核对其中 `uuid` 为你设置的 `NODE_UUID`、`servername` 为你设置的 `DOMAIN`（而非 `sub.example.com`）；
+4. 在 **「实时监控大屏」** 点击一次 **「立即执行全网 Preferred-IP 优选」**，确认测速日志与 KV 写入正常。
 
 ---
 
